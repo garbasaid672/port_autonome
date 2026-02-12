@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='flash.css') }}">
+    <meta charset="UTF-8">
+    <title> Ajouter une base</title>
+    <style>
+        /* Fond et texte */
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 40px; 
+            background-color: #f0f4f8; 
+            color: #333; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 { 
+            color: #0b3d91; 
+            margin-bottom: 20px;
+        }
+
+        /* Formulaire centré */
+        form { 
+            background-color: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        input { 
+            padding: 10px; 
+            margin: 10px; 
+            width: 220px; 
+            border: 1px solid #ccc; 
+            border-radius: 5px; 
+            font-size: 16px;
+        }
+
+        button { 
+            padding: 10px 20px; 
+            margin-top: 15px; 
+            background-color: #0b3d91; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px;
+        }
+
+        button:hover { 
+            background-color: #06478c; 
+        }
+
+        a { 
+            margin-top: 20px; 
+            color: #0b3d91; 
+            font-weight: bold; 
+            text-decoration: none; 
+        }
+
+        a:hover { 
+            text-decoration: underline; 
+        }
+
+        /* Message flash */
+        .flash-message {
+            background-color: #d4edda; 
+            color: #155724; 
+            padding: 10px; 
+            margin-bottom: 20px; 
+            border-radius: 5px; 
+            border: 1px solid #c3e6cb;
+            width: 300px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>➕Add a new DB</h2>
+
+    <!-- Message flash -->
+    
+          
+      <div class="flash-message"></div>
+   
+
+<form method="POST" action="{{ url_for('ajouter') }}">
+    <input type="text" name="nom_base" placeholder="Nom de la base" required>
+    <input type="number" name="identifiant" placeholder="identifiant" required>
+    <input type="text" name="nom" placeholder="Nom" required>
+    <input type="number" name="age" placeholder="Âge" required>
+    <input type="text" name="infos" placeholder="Infos" required>
+    <button type="submit">Ajouter</button>
+</form>
+
+<script>
+const nomBase = document.querySelector('input[name="nom_base"]');
+nomBase.addEventListener('input', function() {
+    // Supprime tout ce qui n'est pas une lettre
+    this.value = this.value.replace(/[^A-Za-z]/g, '');
+});
+</script>
+<script>
+const nom = document.querySelector('input[name = "nom"]');
+nom.addEventListener('input', function(){
+     this.value = this.value.replace(/[^A-Za-z]/g, '');
+}) ;   
+</script>
+
+<a href="{{ url_for('index') }}">⬅ Retour à la page d'acceuil</a>
+        
+
+    <!-- Formulaire -->
+   
+
+
+</body>
+</html>

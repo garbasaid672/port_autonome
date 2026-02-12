@@ -1,0 +1,12 @@
+.flash-success {
+    background: #28a745;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+}
+.flash-danger {
+    background: #dc3545;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+}

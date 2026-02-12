@@ -1,0 +1,72 @@
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    padding: 40px;
+}
+
+h1, h2 {
+    margin-bottom: 20px;
+    color: #dc0de3;
+}
+
+table {
+    border-collapse: collapse;
+    width: 95%;          /* plus large pour plus d'espace */
+    margin-bottom: 40px;
+    background: white;
+    font-size: 16px;     
+}
+
+th, td {
+    border: 1px solid #08e71e;
+    padding: 16px;       /* plus d'espace dans les cellules */
+    text-align: center;
+}
+
+th {
+    background: #1f22d3;
+    color: white;
+}
+
+.box {
+    background: #e0f7fa;
+    padding: 30px;       
+    border-radius: 12px;
+    margin-top: 40px;
+}
+
+button {
+    padding: 10px 20px;
+    background-color: #2e6c80;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #1f4f5f;
+}
+
+select {
+    padding: 10px;
+    margin-right: 10px;
+    font-size: 15px;
+}
+
+.btn-copy {
+    background-color: #28a745;  
+    color: white;
+}
+
+.btn-notify {
+    background-color: #ffc107;  
+    color: black;
+}
+
+.btn-home {
+    background-color: #007bff;  
+    color: white;
+}
+
