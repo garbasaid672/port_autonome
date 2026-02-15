@@ -90,14 +90,26 @@
       <div class="flash-message"></div>
    
 
+
 <form method="POST" action="{{ url_for('ajouter') }}">
+    <label>Nom de la base :</label>
     <input type="text" name="nom_base" placeholder="Nom de la base" required>
-    <input type="number" name="identifiant" placeholder="identifiant" required>
+
+    <label>Identifiant :</label>
+    <input type="number" name="identifiant" placeholder="ID" required>
+
+    <label>Nom :</label>
     <input type="text" name="nom" placeholder="Nom" required>
+
+    <label>Âge :</label>
     <input type="number" name="age" placeholder="Âge" required>
-    <input type="text" name="infos" placeholder="Infos" required>
+
+    <label>Infos :</label>
+    <textarea name="infos" placeholder="Informations" required></textarea>
+
     <button type="submit">Ajouter</button>
 </form>
+
 
 <script>
 const nomBase = document.querySelector('input[name="nom_base"]');
@@ -121,4 +133,5 @@ nom.addEventListener('input', function(){
 
 
 </body>
+
 </html>

@@ -103,22 +103,26 @@
 <div id="Traiter" class="tabcontent">
 <h2>À traiter</h2>
 <table border="1">
-<tr>
-    <th>Identifiant</th>
-    <th>Nom</th>
-    <th>Âge</th>
-    <th>Infos</th>
-</tr>
-
-{% for base in bases_a_traiter %}
-<tr>
-    <td>{{ base.id }}</td>
-    <td>{{ base.nom }}</td>
-    <td>{{ base.age }}</td>
-    <td>{{ base.infos }}</td>
-</tr>
-{% endfor %}
+    <thead>
+        <tr>
+            <th>Nom DataBase</th>
+            <th>Identifiant</th>
+            <th>Nom</th>
+            <th>Age</th> 
+        </tr>
+    </thead>
+    <tbody>
+        {% for base in bases_a_traiter %}
+        <tr>
+            <td>{{ base.nom_base }}</td>
+            <td>{{ base.identifiant }}</td>
+            <td>{{ base.nom }}</td>
+            <td>{{ base.age }}</td> 
+        </tr>
+        {% endfor %}
+    </tbody>
 </table>
+
 
 
 

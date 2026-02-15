@@ -13,20 +13,19 @@
 <form method="POST" action="{{ url_for('comparaison') }}" >
   <div class="mb-3">
     <select name="base1" class="form-select" required>
-      <option value="" disabled selected>La première base</option>
-      {% for b in bases %}
-        <option value="{{ b.id }}">{{ b.nom_base }}</option>
-      {% endfor %}
-    </select>
-  </div>
+  <option value="" disabled selected>La première base</option>
+  {% for b in bases %}
+    <option value="{{ b }}">{{ b }}</option>
+  {% endfor %}
+</select>
 
-  <div class="mb-3">
-    <select name="base2" class="form-select" required>
-      <option value="" disabled selected>La deuxième base</option>
-      {% for b in bases %}
-        <option value="{{ b.id }}">{{ b.nom_base }}</option>
-      {% endfor %}
-    </select>
+<select name="base2" class="form-select" required>
+  <option value="" disabled selected>La deuxième base</option>
+  {% for b in bases %}
+    <option value="{{ b }}">{{ b }}</option>
+  {% endfor %}
+</select>
+
   </div>
 
   <button type="submit" class="btn btn-primary">Comparer</button>
@@ -38,12 +37,12 @@
 </div>
 {% endif %}
 
-<h3 class="mt-4">Différences trouvées</h3>
+<h3 class="mt-4">{{ notification }}</h3>
 
-<table id="differencesTable" class="table table-bordered">
+<table class="table table-bordered">
     <thead class="table-light">
         <tr>
-            <th>Champ</th>
+            <th>Ligne</th>
             <th>Base 1</th>
             <th>Base 2</th>
         </tr>
@@ -52,7 +51,7 @@
         {% if differences %}
             {% for diff in differences %}
             <tr>
-                <td>{{ diff.champ }}</td>
+                <td>{{ diff.ligne }}</td>
                 <td>{{ diff.base1 }}</td>
                 <td>{{ diff.base2 }}</td>
             </tr>
@@ -64,6 +63,7 @@
         {% endif %}
     </tbody>
 </table>
+
 
 
 

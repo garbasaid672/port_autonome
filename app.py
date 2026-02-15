@@ -18,23 +18,86 @@ app.config.update(
     MAIL_USERNAME='garbamohamedseidoul@gmail.com',
     MAIL_PASSWORD='cvwizdbmhblhznru',
 )
-DATABASE = r"C:\Users\GARBA\Desktop\port_autonome\database.db"
+DATABASE = r"C:\Users\GARBA\Desktop\port_autonome1\database.db"
 
 mail = Mail(app)
 app.secret_key = "secret123"
 
-def get_db_connection():
+def get_db_connection(database_name):
+    try:
+        return mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="",
+            database=database_name
+        )
+    except mysql.connector.Error as err:
+        print("Erreur MySQL :", err)
+        return None
+    
+conn1 = get_db_connection("port_autonome1")
+conn2 = get_db_connection("port_autonome2")
+
+if not conn1 or not conn2:
+    print("Erreur de connexion au bases")
+
+
+def get_or_create_db(database_name):
+    try:
+        # Connexion au serveur MySQL (sans database)
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password=""
+        )
+        cursor = conn.cursor()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+        conn.close()
+
+        # Connexion à la base
+        return mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="",
+            database=database_name
+        )
+    except mysql.connector.Error as err:
+        print("Erreur MySQL :", err)
+        return None
+
+def get_all_databases_with_bases():
     try:
         conn = mysql.connector.connect(
             host="localhost",
-            user="root",          # ton utilisateur MySQL
-            password="",          # ton mot de passe MySQL
-            database="port_autonome"
+            user="root",
+            password=""
         )
-        return conn
+        cursor = conn.cursor()
+        cursor.execute("SHOW DATABASES")
+        dbs = [db[0] for db in cursor.fetchall()]
+        valid_dbs = []
+
+        for db_name in dbs:
+            # Se connecter à la base
+            try:
+                conn_db = mysql.connector.connect(
+                    host="localhost",
+                    user="root",
+                    password="",
+                    database=db_name
+                )
+                cursor_db = conn_db.cursor()
+                cursor_db.execute("SHOW TABLES LIKE 'bases'")
+                if cursor_db.fetchone():  # si la table 'bases' existe
+                    valid_dbs.append(db_name)
+                conn_db.close()
+            except:
+                continue
+        conn.close()
+        return valid_dbs
     except mysql.connector.Error as e:
-        print("Erreur de connexion MySQL :", e)
-        return None
+        print("Erreur MySQL :", e)
+        return []
 
 
 
@@ -48,7 +111,7 @@ def init_db():
     cursor = conn.cursor()
 
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bases (
+        CREATE TABLE IF NOT EXISTS base (
             id INT AUTO_INCREMENT PRIMARY KEY,
             nom_base VARCHAR(100),
             valeur1 INT,
@@ -128,62 +191,109 @@ def notifier():
 # -------------------- ROUTES EXISTANTES --------------------
 @app.route("/")
 def index():
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    bases_a_traiter = []
 
-    # Utilise 'identifiant' et pas 'id' pour afficher ce que l'utilisateur saisit
-    cursor.execute("SELECT identifiant, nom, age, infos, statut, nom_base FROM bases WHERE statut = 'a_traiter'")
-    bases_a_traiter = cursor.fetchall()
+    # 1️⃣ Récupère dynamiquement toutes les bases avec la table 'bases'
+    all_dbs = get_all_databases_with_bases()  # ta fonction déjà présente
 
-    cursor.execute("SELECT identifiant, nom, age, infos, statut, nom_base FROM bases WHERE statut = 'traite'")
-    bases_traite = cursor.fetchall()
+    for db_name in all_dbs:
+        conn = get_db_connection(db_name)
+        if not conn:
+            continue
+        cursor = conn.cursor(dictionary=True)
 
-    conn.close()
-    return render_template("index.html", bases_a_traiter=bases_a_traiter, bases_traite=bases_traite)
+        # Récupère seulement identifiant, nom, age et nom_base
+        cursor.execute("""
+            SELECT identifiant, nom, age, nom_base 
+            FROM bases 
+            WHERE statut = 'a_traiter'
+        """)
+        rows = cursor.fetchall()
+        bases_a_traiter += rows
+        conn.close()
 
-
-
-
-
-
+    return render_template("index.html", bases_a_traiter=bases_a_traiter)
 
 
 @app.route("/comparaison", methods=["GET", "POST"])
 def comparaison():
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)  # obligatoire pour accéder aux colonnes par nom
-
-    cursor.execute("SELECT * FROM bases")
-    bases = cursor.fetchall()
-
-    differences = []
+    differences_par_table = {}
     notification = ""
 
+    bases_disponibles = get_all_databases_with_bases()
+
     if request.method == "POST":
-        base1_id = request.form.get("base1")
-        base2_id = request.form.get("base2")
+        base1_name = request.form.get("base1")
+        base2_name = request.form.get("base2")
 
-        cursor.execute("SELECT * FROM bases WHERE id = %s", (base1_id,))
-        base1 = cursor.fetchone()
+        conn1 = get_db_connection(base1_name)
+        conn2 = get_db_connection(base2_name)
 
-        cursor.execute("SELECT * FROM bases WHERE id = %s", (base2_id,))
-        base2 = cursor.fetchone()
+        cursor1 = conn1.cursor()
+        cursor2 = conn2.cursor()
 
-        champs = ["identifiant", "nom", "age", "infos"] # colonnes correctes
-        for champ in champs:
-            v1 = base1[champ]
-            v2 = base2[champ]
-            if v1 != v2:
-                differences.append({
-                    "champ": champ,
-                    "base1": v1,
-                    "base2": v2
-                })
+        # Récupérer toutes les tables
+        cursor1.execute("SHOW TABLES")
+        tables_base1 = [t[0] for t in cursor1.fetchall()]
 
-        notification = f"{len(differences)} différence(s) détectée(s)"
+        cursor2.execute("SHOW TABLES")
+        tables_base2 = [t[0] for t in cursor2.fetchall()]
 
-    conn.close()
-    return render_template("comparaison.html", bases=bases, differences=differences, notification=notification)
+        # Tables à comparer : union des deux
+        all_tables = list(set(tables_base1 + tables_base2))
+
+        for table in all_tables:
+            # Récupérer toutes les lignes de la table
+            rows1 = []
+            rows2 = []
+            champs = []
+
+            if table in tables_base1:
+                cursor1.execute(f"SELECT * FROM {table}")
+                rows1 = [dict(zip([desc[0] for desc in cursor1.description], r)) for r in cursor1.fetchall()]
+                champs = [desc[0] for desc in cursor1.description]
+
+            if table in tables_base2:
+                cursor2.execute(f"SELECT * FROM {table}")
+                rows2 = [dict(zip([desc[0] for desc in cursor2.description], r)) for r in cursor2.fetchall()]
+                if not champs:  # si table existe seulement dans base2
+                    champs = [desc[0] for desc in cursor2.description]
+
+            diffs_table = []
+
+            max_len = max(len(rows1), len(rows2))
+            for i in range(max_len):
+                row1 = rows1[i] if i < len(rows1) else {c: "—" for c in champs}
+                row2 = rows2[i] if i < len(rows2) else {c: "—" for c in champs}
+
+                row_diff_base1 = []
+                row_diff_base2 = []
+
+                for c in champs:
+                    v1 = row1.get(c, "—")
+                    v2 = row2.get(c, "—")
+                    if v1 != v2:
+                        row_diff_base1.append(f"{c}: {v1}")
+                        row_diff_base2.append(f"{c}: {v2}")
+
+                if row_diff_base1 or row_diff_base2:
+                    diffs_table.append({
+                        "ligne": i+1,
+                        "base1": ", ".join(row_diff_base1),
+                        "base2": ", ".join(row_diff_base2)
+                    })
+
+            differences_par_table[table] = diffs_table
+
+        conn1.close()
+        conn2.close()
+        notification = "Comparaison terminée"
+
+    return render_template("comparaison.html",
+                           differences_par_table=differences_par_table,
+                           notification=notification,
+                           bases=bases_disponibles)
+
 
 
 
@@ -191,34 +301,46 @@ def comparaison():
 @app.route("/ajouter", methods=["GET", "POST"])
 def ajouter():
     if request.method == "POST":
-        try:
-            nom_base = request.form["nom_base"]
-            identifiant = int(request.form["identifiant"])  # récupère le champ du formulaire
-            nom = request.form["nom"]
-            age = int(request.form["age"])
-            infos = request.form["infos"]
+        nom_base = request.form["nom_base"]
+        identifiant = int(request.form["identifiant"])
+        nom = request.form["nom"]
+        age = int(request.form["age"])
+        infos = request.form["infos"]
 
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                "INSERT INTO bases (nom_base, identifiant, nom, age, infos, statut) VALUES (%s, %s, %s, %s, %s, %s)",
-                (nom_base, identifiant, nom, age, infos, 'a_traiter')
+        # Connexion à la base (la crée si elle n'existe pas)
+        conn = get_or_create_db(nom_base)
+        if not conn:
+            flash(f"Erreur : impossible de créer ou se connecter à la base {nom_base} !", "danger")
+            return redirect(url_for("ajouter"))
+
+        cursor = conn.cursor(dictionary=True)
+
+        # Créer la table 'bases' si elle n'existe pas
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS bases (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nom_base VARCHAR(100),
+                identifiant INT,
+                nom VARCHAR(100),
+                age INT,
+                infos TEXT,
+                statut ENUM('a_traiter','traite') DEFAULT 'a_traiter'
             )
-            conn.commit()
-            conn.close()
+        """)
+        conn.commit()
 
-            flash("Base ajoutée avec succès !", "success")
-            return redirect(url_for("index"))
+        # Insérer la ligne
+        cursor.execute(
+            "INSERT INTO bases (nom_base, identifiant, nom, age, infos, statut) VALUES (%s,%s,%s,%s,%s,%s)",
+            (nom_base, identifiant, nom, age, infos, 'a_traiter')
+        )
+        conn.commit()
+        conn.close()
 
-        except Exception as e:
-            print("❌ ERREUR INSERTION :", e)
-            flash(f"Erreur : {e}", "danger")
+        flash(f"Ligne ajoutée dans la base {nom_base} avec succès !", "success")
+        return redirect(url_for("index"))
 
     return render_template("ajouter.html")
-
-
-
-
 
 
 
