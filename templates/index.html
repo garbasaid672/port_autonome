@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="30">
+    <title>Tableau de bord </title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+         font-family: Arial;
+          margin: 40px;
+           background-color: #f9f9f9;
+            }
+        h1 {
+         color: #2e6c80;
+          }
+        h2 { 
+        color: #444;
+         margin-top: 20px;
+         }
+        .summary {
+             background-color: #e0f7fa;
+              padding: 15px;
+              border-radius: 10px; 
+              width: fit-content; 
+                 }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin-top: 10px; 
+              }
+        th, td { 
+            border: 1px solid #999; 
+            padding: 8px 12px; 
+            text-align: left; 
+               }
+        th { 
+            background-color: #2e6c80; 
+            color: white; 
+           }
+        tr:nth-child(even) { 
+            background-color: #f2f2f2;
+           }
+        .tab { overflow: hidden; border-bottom: 2px solid #2e6c80; margin-top: 30px; }
+        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 10px 20px; font-size: 16px; color: #2e6c80; transition: 0.3s; }
+        .tab button:hover { background-color: #e0f7fa; }
+        .tab button.active { border-bottom: 3px solid #2e6c80; font-weight: bold; color: #1f4f5f; }
+        .tabcontent { display: none; padding: 20px 0; }
+        .tabcontent.active { display: block; }
+        button { cursor: pointer; padding: 8px 15px; border: none; border-radius: 5px; background-color: #2e6c80; color: white; font-size: 14px; transition: 0.2s; }
+        button:hover { background-color: #1f4f5f; }
+        @media (max-width: 800px) { .compare-table { flex-direction: column; } }
+    </style>
+</head>
+<body>
+
+<h1>Gestion des bases de données</h1>
+
+<div class="summary">
+    <p><strong>Nombres de DB :</strong></p>
+    <p><strong>À traiter :</strong></p>
+    <p><strong>Déjà traités :</strong></p>
+</div>
+
+<!-- BOUTONS ONGLET -->
+<div class="tab">
+    <button class="tablinks active" onclick="openTab(event, 'Base')">📈 DataBase</button>
+    <button class="tablinks" onclick="openTab(event, 'Traiter')">🔵 À TRAITER</button>
+    <button class="tablinks" onclick="openTab(event, 'DÉJÀ-TRAITER')">🟢 DÉJÀ TRAITER</button>
+    <button type="button" class="tablink-redirect" onclick="window.location.href='{{ url_for('comparaison') }}'">🤝 Comparer Bases </button>
+    <button type="button" onclick="window.location.href='{{ url_for('ajouter') }}'">➕ Update a new Database</button>
+</div>
+
+<div id="Base" class="tabcontent active">
+
+<h2>📊 DataBase</h2>
+
+<h2>👉 Contenue de la base de donnée</h2>
+
+<table class="table table-bordered mt-3">
+
+<thead>
+<tr>
+<th>Nom DataBase</th>
+<th>Identifiant</th>
+</tr>
+</thead>
+
+<tbody>
+{% for base in bases_a_traiter %}
+<tr>
+<td>{{ base.nom_base }}</td>
+<td>{{ base.identifiant }}</td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+
+
+<div id="Traiter" class="tabcontent">
+<h2>À traiter</h2>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Nom DataBase</th>
+            <th>Identifiant</th>
+            <th>Nom</th>
+            <th>Age</th> 
+        </tr>
+    </thead>
+    <tbody>
+        {% for base in bases_a_traiter %}
+        <tr>
+            <td>{{ base.nom_base }}</td>
+            <td>{{ base.identifiant }}</td>
+            <td>{{ base.nom }}</td>
+            <td>{{ base.age }}</td> 
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+
+
+    
+<a href="{{ url_for('ajouter') }}" class="btn btn-success mt-4">➕ Ajouter une nouvelle base</a>
+
+<div id="DÉJÀ-TRAITER" class="tabcontent ">
+    <h2>Déjà traité</h2>
+<ul>
+{% for base in bases_traite %}
+    <li>{{ base.nom_base }} - {{ base.valeur1 }}, {{ base.valeur2 }}, {{ base.valeur3 }}</li>
+{% endfor %}
+</ul>
+
+<ul>
+  <li>
+  </li>
+</ul>
+    
+
+<div id="Comparer" class="tabcontent">
+    <h2>🤝 Comparer Bases</h2>
+    <div class="mb-3">
+        <label>Base 1 :</label>
+        <select name="base1" class="form-select">
+            <option value="">Choose</option>
+            <option value="{{a}}">{{a}}</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Base 2 :</label>
+        <select name="base2" class="form-select">
+            <option value="">Choose</option>
+            <option value="{{ b }}">{{ b }}</option>
+        </select>
+    </div>
+
+<button class="btn btn-success mt-2" onclick="comparaison()">comparer</button>
+</form>
+
+
+    <div class="mt-3">
+        <div class="alert alert-{{ 'success' if category=='success' else 'danger' }}"></div>
+
+    </div>
+ 
+
+<hr>
+<h3>Différences trouvées</h3>
+<div id="differences">
+</div>
+
+<button type="button" onclick="copyDifferences()" class="btn btn-success mt-3">
+    📋 Copier
+</button>
+<button onclick="envoyerNotification()">📧 Notifier</button>
+
+<script>
+function envoyerNotification() {
+    fetch("/envoyer_notification", { method: "POST" })
+        .then(res => {
+            if (res.ok) alert("📨 Mail envoyé avec succès !");
+            else alert("❌ Erreur envoi mail");
+        });
+}
+</script>
+<script>
+function copyDifferences() {
+    const range = document.createRange();
+    range.selectNode(document.getElementById("differences"));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand("copy");
+    window.getSelection().removeAllRanges();
+    alert("Differences copied !");
+}
+
+function notifyDifferences() {
+    alert("Notifications sent to resolve !");
+    // Ici tu peux ajouter un fetch() vers une route Flask qui envoie un email ou stocke la notification
+}
+</script>
+<form method="POST" action="{{ url_for('comparaison') }}">
+</div>
+
+<!-- SCRIPT ONGLET -->
+<script>
+function openTab(evt, tabName) {
+    document.querySelectorAll(".tabcontent").forEach(tc => tc.classList.remove("active"));
+    document.querySelectorAll(".tablinks").forEach(tl => tl.classList.remove("active"));
+    document.getElementById(tabName).classList.add("active");
+    evt.currentTarget.classList.add("active");
+}
+</script>
+
+</body>
+</html>
