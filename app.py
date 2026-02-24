@@ -3,8 +3,11 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 import os
+import smtplib
+smtplib.SMTP("smtp.gmail.com", 587)
 from flask_mail import Mail, Message
 import pandas as pd  # ajouté pour Excel
+
 
 
 
@@ -16,7 +19,7 @@ app.config.update(
     MAIL_USE_TLS=True,
     MAIL_USE_SSL=False,
     MAIL_USERNAME='garbamohamedseidoul@gmail.com',
-    MAIL_PASSWORD='cvwizdbmhblhznr', 
+    MAIL_PASSWORD='auzkkrwvwiqlppdh', 
 )
 
 
@@ -35,26 +38,13 @@ def get_db_connection(database_name):
         print("Erreur MySQL :", err)
         return None
     
-conn1 = get_db_connection("port_autonome1")
-conn2 = get_db_connection("port_autonome2")
-conn3 = get_db_connection("port_autonome3")
+conn1 = get_db_connection("port_drh")
+conn2 = get_db_connection("port_dsi")
+conn3 = get_db_connection("port_dtl")
 
 if not conn1 or not conn2:
     print("Erreur de connexion au bases")
 
-def create_bases_table_if_not_exists(conn):
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bases (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            identifiant INT,
-            nom VARCHAR(100),
-            age INT,
-            infos TEXT,
-            statut ENUM('a_traiter', 'traite') DEFAULT 'a_traiter'
-        )
-    ''')
-    conn.commit()
 
 def get_or_create_db(database_name):
     try:
@@ -101,7 +91,7 @@ def get_all_databases_with_bases():
                     database=db_name
                 )
                 cursor_db = conn_db.cursor()
-                cursor_db.execute("SHOW TABLES LIKE 'bases'")
+                cursor_db.execute("SHOW TABLES LIKE 'employes'")
                 if cursor_db.fetchone():  # si la table 'bases' existe
                     valid_dbs.append(db_name)
                 conn_db.close()
@@ -124,17 +114,7 @@ def init_db():
 
     cursor = conn.cursor()
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS base (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            nom_base VARCHAR(100),
-            valeur1 INT,
-            valeur2 INT,
-            valeur3 INT,
-            valeur4 INT,
-            statut ENUM('a_traiter','traite') DEFAULT 'a_traiter',
-        )
-    ''')
+
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS resultats_comparaison (
@@ -162,11 +142,21 @@ def init_db():
 # -------------------- ROUTE POUR NOTIFIER AVEC EXCEL --------------------
 @app.route('/notifier', methods=['POST'])
 def notifier():
+
     data = request.get_json()
+
     differences = data.get("differences", [])
+    base1 = data.get("base1", "base1")
+    base2 = data.get("base2", "base2")
     try:
         # 1️⃣ Créer le DataFrame pour Excel
         df = pd.DataFrame(differences)
+        #Ce code pour remplacer les bases par
+        df.columns = [
+    col.replace("base1_", f"{base1}_")
+       .replace("base2_", f"{base2}_")
+    for col in df.columns
+]
 
         # Nom du fichier Excel temporaire
         excel_file = "notification.xlsx"
@@ -201,180 +191,185 @@ def notifier():
 # -------------------- ROUTES EXISTANTES --------------------
 @app.route("/")
 def index():
+
     bases_a_traiter = []
 
-    all_dbs = get_all_databases_with_bases()  # récupère les bases avec table 'bases'
+    conn_global = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password=""
+    )
 
-    for db_name in all_dbs:
+    cursor_global = conn_global.cursor()
+    cursor_global.execute("SHOW DATABASES")
+
+    ignore = {
+        "mysql",
+        "information_schema",
+        "performance_schema",
+        "phpmyadmin",
+        "test"
+    }
+
+    all_databases = [
+        db[0] for db in cursor_global.fetchall()
+        if db[0] not in ignore
+    ]
+
+    conn_global.close()
+
+    # 🔥 parcourir chaque base
+    for db_name in all_databases:
+
         conn = get_db_connection(db_name)
         if not conn:
             continue
+
         cursor = conn.cursor(dictionary=True)
 
-        # Modifier la requête pour ne pas sélectionner 'nom_base'
-        try:
-            cursor.execute("""
-                SELECT identifiant, nom, age 
-                FROM bases
-                WHERE statut = 'a_traiter'
-            """)
-            rows = cursor.fetchall()
-            # Ajoute dynamiquement le nom de la base
-            for r in rows:
-                r['nom_base'] = db_name
-            bases_a_traiter += rows
-        except mysql.connector.Error as e:
-            print(f"Erreur dans {db_name} :", e)
-        finally:
-            conn.close()
+        cursor.execute("SHOW TABLES")
+        tables = [list(t.values())[0] for t in cursor.fetchall()]
 
-    return render_template("index.html", bases_a_traiter=bases_a_traiter)
+        for table in tables:
+
+            if table == "bases":
+                continue
+
+            try:
+                # 🔥 ON PREND SEULEMENT id
+                cursor.execute(f"SELECT id FROM `{table}`")
+
+                rows = cursor.fetchall()
+
+                for r in rows:
+
+                    bases_a_traiter.append({
+                        "nom_base": db_name,
+                        "table": table,
+                        "id": r.get("id", "")
+                    })
+
+            except:
+                pass
+
+        conn.close()
+
+    return render_template(
+        "index.html",
+        bases_a_traiter=bases_a_traiter,
+        all_databases=all_databases
+    )
 
 
 @app.route("/comparaison", methods=["GET", "POST"])
 def comparaison():
-
-    differences = []
     notification = ""
-    champs = []
-
-    # Connexion et récupération des bases
+    tables_differences = {}
     bases_disponibles = get_all_databases_with_bases()
+    all_tables = []
 
-    if request.method == "POST":
+    # récupérer les bases choisies dans le formulaire
+    base1_name = request.form.get("base1")
+    base2_name = request.form.get("base2")
 
-        base1_name = request.form.get("base1")
-        base2_name = request.form.get("base2")
-        base3_name = request.form.get("base3")
-
+    # si les deux bases sont sélectionnées, récupérer leurs tables
+    if base1_name and base2_name:
         conn1 = get_db_connection(base1_name)
         conn2 = get_db_connection(base2_name)
-        conn3 = get_db_connection(base3_name)
+        if conn1 and conn2:
+            cursor1 = conn1.cursor(dictionary=True)
+            cursor2 = conn2.cursor(dictionary=True)
 
-        if not conn1 or not conn2:
-            flash("Impossible de se connecter à l'une des bases.", "danger")
-            return redirect(url_for("comparaison"))
+            cursor1.execute("SHOW TABLES")
+            tables1 = [list(t.values())[0] for t in cursor1.fetchall()]
 
-        cursor1 = conn1.cursor(dictionary=True)
-        cursor2 = conn2.cursor(dictionary=True)
+            cursor2.execute("SHOW TABLES")
+            tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
 
-        # récupérer tables
-        cursor1.execute("SHOW TABLES")
-        tables1 = [list(t.values())[0] for t in cursor1.fetchall()]
+            all_tables = sorted(set(tables1) | set(tables2))
 
-        cursor2.execute("SHOW TABLES")
-        tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
-        
-        # 🚨 vérifier que chaque base possède exactement 4 tables
-        
-        if len(tables1) < 4 or len(tables2) < 4:
-            notification = "comparaison is no dey"
             conn1.close()
             conn2.close()
-            return render_template(
-                "comparaison.html",
-                differences=[],
-                notification=notification,
-                bases=bases_disponibles
-                )
 
-        
-        # tables communes
-        tables_communes = set(tables1) & set(tables2)
+    # si on clique sur Comparer
+    if request.method == "POST" :
+        base1_name and base2_name
+        selected_tables = request.form.getlist("tables")
 
-        differences_exist = False
+        if not selected_tables:
+            flash("⚠️ Veuillez choisir au moins une table à comparer !", "warning")
+        else:
+            # comparer uniquement les tables cochées
+            conn1 = get_db_connection(base1_name)
+            conn2 = get_db_connection(base2_name)
+            cursor1 = conn1.cursor(dictionary=True)
+            cursor2 = conn2.cursor(dictionary=True)
 
-        for table in tables_communes:
+            for table in selected_tables:
+                table1_exists = table in tables1
+                table2_exists = table in tables2
 
-            cursor1.execute(f"SELECT * FROM {table}")
-            rows1 = cursor1.fetchall()
-
-            cursor2.execute(f"SELECT * FROM {table}")
-            rows2 = cursor2.fetchall()
-
-            # ⚠️ éviter crash si table vide
-            if rows1:
-                champs = [c for c in rows1[0].keys() if c != "id"]
-            elif rows2:
-                champs = [c for c in rows2[0].keys() if c != "id"]
-            else:
-                continue
-
-            dict1 = {r['identifiant']: r for r in rows1 if 'identifiant' in r}
-            dict2 = {r['identifiant']: r for r in rows2 if 'identifiant' in r}
-
-            all_ids = sorted(set(dict1.keys()) | set(dict2.keys()))
-
-            for ident in all_ids:
-
-                r1 = dict1.get(ident)
-                r2 = dict2.get(ident)
-
-                if r1 and r2:
-                    has_diff = any(r1[c] != r2[c] for c in champs)
-                else:
-                    has_diff = True
-
-                if has_diff:
-
-                    differences_exist = True
-
-                    diff_row = {
+                if not table1_exists or not table2_exists:
+                    tables_differences.setdefault(table, []).append({
                         "table": table,
-                        "identifiant": ident
-                    }
+                        "base1_table": "✅ existe" if table1_exists else "❌ absente",
+                        "base2_table": "✅ existe" if table2_exists else "❌ absente"
+                    })
+                    continue
 
-                    for champ in champs:
-                        diff_row[f"base1_{champ}"] = r1.get(champ) if r1 else ""
-                        diff_row[f"base2_{champ}"] = r2.get(champ) if r2 else ""
+                cursor1.execute(f"SHOW COLUMNS FROM `{table}`")
+                cols1 = [c["Field"] for c in cursor1.fetchall()]
 
-                    differences.append(diff_row)
+                cursor2.execute(f"SHOW COLUMNS FROM `{table}`")
+                cols2 = [c["Field"] for c in cursor2.fetchall()]
 
-        # ✅ si aucune différence → afficher toutes les lignes fusionnées
-        if not differences_exist:
+                common_cols = list(set(cols1) & set(cols2))
+                if not common_cols:
+                    continue
 
-            for table in tables_communes:
-
-                cursor1.execute(f"SELECT * FROM {table}")
+                cursor1.execute(f"SELECT * FROM `{table}`")
                 rows1 = cursor1.fetchall()
 
-                cursor2.execute(f"SELECT * FROM {table}")
+                cursor2.execute(f"SELECT * FROM `{table}`")
                 rows2 = cursor2.fetchall()
 
-                dict1 = {r['identifiant']: r for r in rows1 if 'identifiant' in r}
-                dict2 = {r['identifiant']: r for r in rows2 if 'identifiant' in r}
+                key = next((k for k in ["id", "identifiant"] if k in common_cols), common_cols[0])
+                dict1 = {r[key]: r for r in rows1 if key in r}
+                dict2 = {r[key]: r for r in rows2 if key in r}
 
-                all_ids = sorted(set(dict1.keys()) | set(dict2.keys()))
+                all_ids = set(dict1.keys()) | set(dict2.keys())
 
                 for ident in all_ids:
-
                     r1 = dict1.get(ident)
                     r2 = dict2.get(ident)
 
-                    diff_row = {
-                        "table": table,
-                        "identifiant": ident
-                    }
+                    row_diff = {}
+                    has_diff = False
+                    for col in common_cols:
+                        val1 = r1.get(col) if r1 else None
+                        val2 = r2.get(col) if r2 else None
+                        if val1 != val2:
+                            has_diff = True
+                        row_diff[f"base1_{col}"] = val1 if val1 is not None else "❌ absent"
+                        row_diff[f"base2_{col}"] = val2 if val2 is not None else "❌ absent"
+                    if has_diff or not r1 or not r2:
+                        row_diff["table"] = table
+                        row_diff[key] = ident
+                        tables_differences.setdefault(table, []).append(row_diff)
 
-                    for champ in champs:
-                        diff_row[f"base1_{champ}"] = r1.get(champ) if r1 else ""
-                        diff_row[f"base2_{champ}"] = r2.get(champ) if r2 else ""
-
-                    differences.append(diff_row)
-
-            notification = "✅ Aucune différence"
-
-        else:
-            notification = f"{len(differences)} différence(s) trouvée(s)"
-
-        conn1.close()
-        conn2.close()
+            notification = (
+                f"⚠️ {sum(len(v) for v in tables_differences.values())} différence(s)"
+                if tables_differences else "✅ aucune différence"
+            )
+            conn1.close()
+            conn2.close()
 
     return render_template(
         "comparaison.html",
-        differences=differences,
-        notification=notification,
-        bases=bases_disponibles
+        bases=bases_disponibles,
+        all_tables=all_tables,
+        tables_differences=tables_differences,
+        notification=notification
     )
 
 
@@ -417,18 +412,8 @@ def ajouter():
 
         cursor = conn.cursor(dictionary=True)
 
-        # Créer la table 'bases' si elle n'existe pas
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS bases (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                identifiant INT,
-                nom VARCHAR(100),
-                age INT,
-                infos TEXT,
-                statut ENUM('a_traiter','traite') DEFAULT 'a_traiter'
-            )
-        """)
-        conn.commit()
+
+
 
         # Vérifier si la table personnalisée existe déjà
         cursor.execute(f"SHOW TABLES LIKE %s", (nom_table,))
@@ -447,9 +432,9 @@ def ajouter():
 
         # Ajouter la ligne dans la table 'bases'
         cursor.execute(
-            "INSERT INTO bases (identifiant, nom, age, infos) VALUES (%s, %s, %s, %s)",
-            (identifiant, nom, age, infos)
-        )
+    f"INSERT INTO `{nom_table}` (identifiant, nom, age, infos) VALUES (%s, %s, %s, %s)",
+    (identifiant, nom, age, infos)
+)
         conn.commit()
         conn.close()
 

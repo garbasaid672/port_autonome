@@ -4,160 +4,187 @@
     <meta charset="UTF-8">
     <title>Comparer Bases</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-
     <style>
-    /* Séparation plus épaisse entre Base 1 et Base 2 */
-    #differencesTable td.separator,
-    #differencesTable th.separator {
-        border-left: 3px solid #0b3d91; /* ⚡ Note l'espace entre solid et la couleur */
-    }
+        button:active { animation: bounce 0.3s; }
+        @keyframes bounce {
+            0%   { transform: scale(1); }
+            30%  { transform: scale(1.2); }
+            50%  { transform: scale(0.9); }
+            70%  { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .separator { border-left: 3px solid #0b3d91; }
     </style>
 </head>
-
 <body class="p-4">
 
 <h2>Comparer des bases de données</h2>
 
-<form method="POST" action="{{ url_for('comparaison') }}" >
-  <div class="mb-3">
-    <select name="base1" class="form-select" required>
-  <option value="" disabled selected>La première base</option>
-  {% for b in bases %}
-    <option value="{{ b }}">{{ b }}</option>
-  {% endfor %}
-</select>
+<form method="POST" action="{{ url_for('comparaison') }}" style="margin-bottom:30px; width:100%;">
+    <!-- Base 1 -->
+    <div style="margin-bottom:15px;">
+        <label for="base1" style="font-weight:bold; display:block; margin-bottom:5px; font-size:18px;">Base 1 :</label>
+        <select id="base1" name="base1" style="width:100%; padding:12px; font-size:18px;">
+            {% for b in bases %}
+                <option value="{{ b }}" {% if b == request.form.get('base1') %}selected{% endif %}>
+                    {{ b }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
 
-<select name="base2" class="form-select" required>
-  <option value="" disabled selected>La deuxième base</option>
-  {% for b in bases %}
-    <option value="{{ b }}">{{ b }}</option>
-  {% endfor %}
-</select>
+    <!-- Base 2 -->
+    <div style="margin-bottom:20px;">
+        <label for="base2" style="font-weight:bold; display:block; margin-bottom:5px; font-size:18px;">Base 2 :</label>
+        <select id="base2" name="base2" style="width:100%; padding:12px; font-size:18px;">
+            {% for b in bases %}
+                <option value="{{ b }}" {% if b == request.form.get('base2') %}selected{% endif %}>
+                    {{ b }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
 
-  </div>
+    <div class="mb-3">
+    <strong>Choisissez les tables à comparer :</strong><br>
+    {% if all_tables %}
+        {% for table in all_tables %}
+            <input 
+                type="checkbox" 
+                name="tables" 
+                value="{{ table }}" 
+                id="table_{{ loop.index }}"
+                {% if request.form.getlist('tables') and table in request.form.getlist('tables') %}checked{% endif %}
+            
+            <label for="table_{{ loop.index }}">{{ table }}</label><br>
+        {% endfor %}
+    {% else %}
 
-  <button type="submit" class="btn btn-primary">Comparer</button>
+    {% endif %}
+</div>
+
+    <!-- Bouton Comparer -->
+    <div style="margin-bottom:30px;">
+        <button type="submit" style="width:100%; padding:15px; font-size:18px; font-weight:bold;">
+            Comparer
+        </button>
+    </div>
 </form>
 
 {% if notification %}
-<div class="alert alert-info mt-4">
-  {{ notification }}
-</div>
+<div class="alert alert-info mt-4">{{ notification }}</div>
 {% endif %}
 
-<h3 class="mt-4">{{ notification }}</h3>
+{% if tables_differences %}
+    {% for table, rows in tables_differences.items() %}
+        <h4 class="mt-4">Table : {{ table }}</h4>
+        <table class="table table-bordered differences-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Identifiant</th>
+                    {% for base_name in rows[0].keys() if base_name.startswith('base1_') %}
+                        <th>{{ base_name[6:] }} (Base 1)</th>
+                    {% endfor %}
+                    {% for base_name in rows[0].keys() if base_name.startswith('base2_') %}
+                        <th>{{ base_name[6:] }} (Base 2)</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.get('id') or row.get('identifiant') or '-' }}</td>
+                        {% for base in row.keys() if base.startswith('base1_') %}
+                            <td>{{ row[base] }}</td>
+                        {% endfor %}
+                        {% for base in row.keys() if base.startswith('base2_') %}
+                            <td>{{ row[base] }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
 
-<table class="table table-bordered" id="differencesTable">
-    <thead class="table-light text-center">
-        <tr>
-            <th rowspan="2">Table</th>
-            <th colspan="4">Base 1</th>
-            <th class="separator" colspan="4">Base 2</th>
-        </tr>
-        <tr>
-            <th>Identifiant</th>
-            <th>Nom</th>
-            <th>Age</th>
-            <th class="separator">Identifiant</th>
-            <th>Nom</th>
-            <th>Age</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% if differences %}
-            {% for diff in differences %}
-            <tr>
-                <td>{{ diff.table }}</td>
-                <td>{{ diff.base1_identifiant }}</td>
-                <td>{{ diff.base1_nom }}</td>
-                <td>{{ diff.base1_age }}</td>
-                <td class="separator">{{ diff.base2_identifiant }}</td>
-                <td>{{ diff.base2_nom }}</td>
-                <td>{{ diff.base2_age }}</td>
-            </tr>
-            {% endfor %}
-        {% else %}
-            <tr>
-                <td colspan="9" class="text-center">Aucune différence à afficher</td>
-            </tr>
-        {% endif %}
-    </tbody>
-</table>
+    <!-- Un seul bouton Copier et Notifier pour toutes les tables -->
+    <div class="mb-3 d-flex gap-2 mt-3">
+        <button type="button" id="copyAll" class="btn btn-success">📋 Copy</button>
+        <button type="button" id="notifyAll" class="btn btn-warning">🔔 Notify</button>
+    </div>
 
-<!-- BOUTONS -->
-<button type="button" onclick="copyDifferences()" class="btn btn-success mt-3">
-    📋 Copier
-</button>
-<button type="button" onclick="notifyDifferences()" class="btn btn-warning mt-3">
-    🔔 Notifier
-</button>
+{% else %}
 
-<a href="{{ url_for('index') }}" class="btn btn-link mt-4">
-  ⬅ Retour à la page d’accueil
-</a>
+{% endif %}
 
-<!-- JS -->
+<a href="{{ url_for('index') }}" class="btn btn-link">⬅ Retour à la page d’accueil</a>
+
 <script>
-function copyDifferences() {
-    const table = document.getElementById("differencesTable");
-    let text = "";
-    for (let i = 1; i < table.rows.length; i++) {
-        const row = table.rows[i];
-        const champ = row.cells[0].innerText;
-        const v1 = row.cells[1].innerText;
-        const v2 = row.cells[2].innerText;
-        if (champ !== "Aucune différence à afficher") {
-            text += champ + "\t" + v1 + "\t" + v2 + "\n";
-        }
-    }
-    navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Différences copiées dans le presse-papiers !");
+document.addEventListener("DOMContentLoaded", () => {
+
+    const copyAllBtn = document.getElementById("copyAll");
+    const notifyAllBtn = document.getElementById("notifyAll");
+
+    copyAllBtn.addEventListener("click", () => {
+        const tables = document.querySelectorAll(".differences-table");
+        let text = "";
+        tables.forEach(table => {
+            for (let i = 0; i < table.rows.length; i++) {
+                const row = table.rows[i];
+                let rowText = [];
+                for (let j = 0; j < row.cells.length; j++) rowText.push(row.cells[j].innerText);
+                text += rowText.join("\t") + "\n";
+            }
+            text += "\n"; // séparation entre tableaux
+        });
+        navigator.clipboard.writeText(text).then(() => alert("✅ Toutes les différences copiées !"));
     });
-}
 
-function notifyDifferences() {
-    const table = document.getElementById("differencesTable");
-    if (!table) {
-        alert("❌ Aucune différence à notifier !");
-        return;
-    }
-
+notifyAllBtn.addEventListener("click", () => {
+    const tables = document.querySelectorAll(".differences-table");
     const differencesArray = [];
-    for (let i = 1; i < table.rows.length; i++) {
-        const row = table.rows[i];
-        const champ = row.cells[0].innerText || "N/A";
-        const v1 = row.cells[1].innerText || "N/A";
-        const v2 = row.cells[2].innerText || "N/A";
 
-        if (champ !== "Aucune différence à afficher") {
-            differencesArray.push({ champ: champ, v1: v1, v2: v2 });
+    tables.forEach(table => {
+        const headers = Array.from(table.rows[0].cells).map(cell => cell.innerText); // noms exacts
+        for (let i = 1; i < table.rows.length; i++) { // skip header
+            const row = table.rows[i];
+            const rowData = {};
+            headers.forEach((h, j) => {
+                rowData[h] = row.cells[j].innerText || "N/A"; // garder les bons noms
+            });
+            differencesArray.push(rowData);
         }
-    }
+    });
 
     if (differencesArray.length === 0) {
         alert("❌ Aucune différence à notifier !");
         return;
     }
 
-    // ⚡ Envoyer au serveur Flask /notifier
+    const base1 = document.getElementById("base1").value;
+    const base2 = document.getElementById("base2").value;
+
     fetch("/notifier", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ differences: differencesArray })
+        body: JSON.stringify({
+            differences: differencesArray,
+            base1: base1,
+            base2: base2
+        })
     })
-    .then(response => response.json())
+    .then(res => res.json())
     .then(data => {
-        if (data.status === "success") {
+        if (data.status === "success")
             alert("✅ Notification envoyée !");
-        } else {
+        else
             alert("❌ Erreur : " + data.message);
-        }
     })
-    .catch(error => {
-        console.error(error);
+    .catch(err => {
+        console.error(err);
         alert("❌ Impossible d’envoyer la notification.");
     });
-}
+});
+});
 </script>
 
 </body>
