@@ -69,7 +69,7 @@
 
 <h2>➕ Créer une nouvelle table</h2>
 
-<!-- Flash messages -->
+<!-- Flash messages des bases ou tables creer -->
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
@@ -78,9 +78,8 @@
   {% endif %}
 {% endwith %}
 
-<form method="POST" action="{{ url_for('ajouter') }}">
+<form method="POST" id="formCreation">
 
-    <!-- base existante -->
     <select name="nom_base_select">
         <option value="">Choisir une base existante</option>
         {% for base in bases %}
@@ -90,24 +89,17 @@
 
     <p>OU</p>
 
-    <!-- nouvelle base -->
     <input type="text" name="nom_base_new"
             placeholder="Nouvelle base (ex: azerty)"
             pattern="[A-Za-z0-9_]+"
             title="Lettres, chiffres et underscore">
 
     <input type="text" name="nom_table" placeholder="Nom de la table" required>
-
     <input type="number" name="identifiant" placeholder="Identifiant" required>
+    <input type="text" name="Num_Facture" placeholder="Num_Facture" required>
+    <input type="number" name="Libelle" placeholder="Libelle" required>
 
-    <input type="text" name="nom" placeholder="Nom" required>
-
-    <input type="number" name="age" placeholder="Age" required>
-
-    <input type="text" name="infos" placeholder="Infos" required>
-
-
-    <button type="submit">Création</button>
+    <button type="submit">Créer</button>
 
 </form>
 
@@ -125,6 +117,19 @@ nomTable.addEventListener('input', function() {
     this.value = this.value.replace(/[^A-Za-z0-9_]/g, '');
 });
 </script>
+<script>
+document.getElementById("formCreation").addEventListener("submit", function(e) {
+
+    const baseSelect = document.querySelector("[name='nom_base_select']").value.trim();
+    const baseNew = document.querySelector("[name='nom_base_new']").value.trim();
+
+    if (baseSelect === "" && baseNew === "") {
+        e.preventDefault();
+        alert("Vous devez choisir une base existante OU créer une nouvelle base.");
+    }
+});
+</script>
 
 </body>
+
 </html>

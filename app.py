@@ -69,8 +69,12 @@ def get_or_create_db(database_name):
         print("Erreur MySQL :", err)
         return None
 
+import mysql.connector
+
 def get_all_databases_with_bases():
+    valid_dbs = []  # initialiser la liste avant tout
     try:
+        # connexion générale
         conn = mysql.connector.connect(
             host="localhost",
             user="root",
@@ -79,11 +83,15 @@ def get_all_databases_with_bases():
         cursor = conn.cursor()
         cursor.execute("SHOW DATABASES")
         dbs = [db[0] for db in cursor.fetchall()]
-        valid_dbs = []
 
         for db_name in dbs:
-            # Se connecter à la base
+            # Ignorer les bases systèmes
+            if db_name in ["information_schema", "mysql", "performance_schema", "phpmyadmin"]:
+                continue
+
+            conn_db = None
             try:
+                # connexion à la base spécifique
                 conn_db = mysql.connector.connect(
                     host="localhost",
                     user="root",
@@ -91,19 +99,24 @@ def get_all_databases_with_bases():
                     database=db_name
                 )
                 cursor_db = conn_db.cursor()
-                cursor_db.execute("SHOW TABLES LIKE 'employes'")
-                if cursor_db.fetchone():  # si la table 'bases' existe
+                cursor_db.execute("SHOW TABLES")  # récupérer toutes les tables
+                tables = cursor_db.fetchall()
+
+                if tables:  # si la base contient au moins une table
                     valid_dbs.append(db_name)
-                conn_db.close()
-            except:
-                continue
+
+            except mysql.connector.Error:
+                continue  # ignore les bases où la connexion échoue
+            finally:
+                if conn_db:
+                    conn_db.close()  # ferme seulement si la connexion a été créée
+
         conn.close()
         return valid_dbs
+
     except mysql.connector.Error as e:
         print("Erreur MySQL :", e)
         return []
-
-
 
 
 def init_db():
@@ -273,23 +286,28 @@ def comparaison():
     base2_name = request.form.get("base2")
 
     # si les deux bases sont sélectionnées, récupérer leurs tables
-    if base1_name and base2_name:
-        conn1 = get_db_connection(base1_name)
-        conn2 = get_db_connection(base2_name)
-        if conn1 and conn2:
-            cursor1 = conn1.cursor(dictionary=True)
-            cursor2 = conn2.cursor(dictionary=True)
+    tables1 = []
+    tables2 = []
 
+    if base1_name:
+        conn1 = get_db_connection(base1_name)
+        if conn1:
+            cursor1 = conn1.cursor(dictionary=True)
             cursor1.execute("SHOW TABLES")
             tables1 = [list(t.values())[0] for t in cursor1.fetchall()]
+            conn1.close()
 
+    if base2_name:
+        conn2 = get_db_connection(base2_name)
+        if conn2:
+            cursor2 = conn2.cursor(dictionary=True)
             cursor2.execute("SHOW TABLES")
             tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
-
-            all_tables = sorted(set(tables1) | set(tables2))
-
-            conn1.close()
             conn2.close()
+
+    # On accepte seulement les bases qui ont au moins 1 table
+    if tables1 or tables2:
+        all_tables = sorted(set(tables1) | set(tables2))
 
     # si on clique sur Comparer
     if request.method == "POST" :
@@ -399,10 +417,7 @@ def ajouter():
         age = request.form.get("age")
         infos = request.form.get("infos", "")
 
-        # Vérifier que les champs obligatoires sont remplis
-        if not nom_table or not identifiant or not nom or not age:
-            flash("Veuillez remplir tous les champs obligatoires !", "danger")
-            return redirect(url_for("ajouter"))
+
 
         # Créer la base si elle n'existe pas
         conn = get_or_create_db(nom_base)
