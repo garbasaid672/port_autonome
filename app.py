@@ -167,7 +167,7 @@ def notifier():
         #Ce code pour remplacer les bases par
         df.columns = [
     col.replace("base1_", f"{base1}_")
-       .replace("base2_", f"{base2}_")
+        .replace("base2_", f"{base2}_")
     for col in df.columns
 ]
 
@@ -364,12 +364,16 @@ def comparaison():
                     row_diff = {}
                     has_diff = False
                     for col in common_cols:
+                        if col == key:
+                            continue  # on ignore la colonne clé
+
                         val1 = r1.get(col) if r1 else None
                         val2 = r2.get(col) if r2 else None
-                        if val1 != val2:
+
+                        if str(val1).strip() != str(val2).strip():
                             has_diff = True
-                        row_diff[f"base1_{col}"] = val1 if val1 is not None else "❌ absent"
-                        row_diff[f"base2_{col}"] = val2 if val2 is not None else "❌ absent"
+                            row_diff[f"base1_{col}"] = val1
+                            row_diff[f"base2_{col}"] = val2
                     if has_diff or not r1 or not r2:
                         row_diff["table"] = table
                         row_diff[key] = ident
