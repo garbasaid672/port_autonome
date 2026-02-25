@@ -122,7 +122,7 @@
 
 {% endif %}
 
-<a href="{{ url_for('index') }}">⬅ Retour à l'accueil</a>
+<a href="{{ url_for('index') }}">⬅ Return to the reception</a>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -142,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             text += "\n"; // séparation entre tableaux
         });
-        navigator.clipboard.writeText(text).then(() => alert("✅ Toutes les différences copiées !"));
+        navigator.clipboard.writeText(text).then(() => alert("✅ Differences are copied !"));
     });
 
 notifyAllBtn.addEventListener("click", () => {
