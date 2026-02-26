@@ -13,6 +13,7 @@ import pandas as pd  # ajouté pour Excel
 
 app = Flask(__name__)
 
+
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -39,7 +40,9 @@ def get_db_connection(database_name):
         return None
     
 conn1 = get_db_connection("port_drh")
+
 conn2 = get_db_connection("port_dsi")
+
 conn3 = get_db_connection("port_dtl")
 
 if not conn1 or not conn2:
@@ -66,6 +69,7 @@ def get_or_create_db(database_name):
             database=database_name
         )
     except mysql.connector.Error as err:
+        
         print("Erreur MySQL :", err)
         return None
 
@@ -91,6 +95,7 @@ def get_all_databases_with_bases():
 
             conn_db = None
             try:
+                
                 # connexion à la base spécifique
                 conn_db = mysql.connector.connect(
                     host="localhost",
@@ -179,13 +184,17 @@ def notifier():
         msg = Message(
             subject="Notification des différences",
             sender=app.config['MAIL_USERNAME'],
+            
             recipients=["garbamohamedseidoul@gmail.com"],   # tu peux ajouter d'autres emails ici
+            
             body="Bonjour,\n\nVeuillez trouver ci-joint le tableau des différences détectées.\n\nCordialement."
         )
 
         # 3️⃣ Attacher le fichier Excel
         with open(excel_file, "rb") as f:
+            
             msg.attach(
+                
                 "notification.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 f.read()
@@ -227,6 +236,7 @@ def index():
     all_databases = [
         db[0] for db in cursor_global.fetchall()
         if db[0] not in ignore
+        
     ]
 
     conn_global.close()
@@ -273,25 +283,25 @@ def index():
         all_databases=all_databases
     )
 
-
 @app.route("/comparaison", methods=["GET", "POST"])
 def comparaison():
+    
     notification = ""
     tables_differences = {}
     bases_disponibles = get_all_databases_with_bases()
     all_tables = []
+    columns_by_table = {}
+    selected_columns_by_table = {}
 
-    # récupérer les bases choisies dans le formulaire
     base1_name = request.form.get("base1")
     base2_name = request.form.get("base2")
 
-    # si les deux bases sont sélectionnées, récupérer leurs tables
-    tables1 = []
-    tables2 = []
-
+    # Récupération des tables pour chaque base
+    tables1 = tables2 = []
     if base1_name:
         conn1 = get_db_connection(base1_name)
         if conn1:
+            
             cursor1 = conn1.cursor(dictionary=True)
             cursor1.execute("SHOW TABLES")
             tables1 = [list(t.values())[0] for t in cursor1.fetchall()]
@@ -300,89 +310,96 @@ def comparaison():
     if base2_name:
         conn2 = get_db_connection(base2_name)
         if conn2:
+            
             cursor2 = conn2.cursor(dictionary=True)
             cursor2.execute("SHOW TABLES")
             tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
             conn2.close()
 
-    # On accepte seulement les bases qui ont au moins 1 table
+    # Union des tables
     if tables1 or tables2:
+        
         all_tables = sorted(set(tables1) | set(tables2))
 
-    # si on clique sur Comparer
-    if request.method == "POST" :
-        base1_name and base2_name
+    if request.method == "POST":
+        
         selected_tables = request.form.getlist("tables")
 
-        if not selected_tables:
-            flash("⚠️ Veuillez choisir au moins une table à comparer !", "warning")
+        # Première étape : récupération des colonnes
+        if selected_tables and not any(k.startswith("columns_") for k in request.form.keys()):
+            if base1_name:
+                conn = get_db_connection(base1_name)
+                cursor = conn.cursor(dictionary=True)
+                for table in selected_tables:
+                    cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+                    columns_by_table[table] = [c["Field"] for c in cursor.fetchall()]
+                conn.close()
         else:
-            # comparer uniquement les tables cochées
+            # Deuxième étape : comparaison des colonnes sélectionnées
+            selected_columns_by_table = {
+                table: request.form.getlist(f"columns_{table}")
+                for table in selected_tables
+                
+            }
+
             conn1 = get_db_connection(base1_name)
             conn2 = get_db_connection(base2_name)
             cursor1 = conn1.cursor(dictionary=True)
             cursor2 = conn2.cursor(dictionary=True)
 
             for table in selected_tables:
-                table1_exists = table in tables1
-                table2_exists = table in tables2
-
-                if not table1_exists or not table2_exists:
+                if table not in tables1 or table not in tables2:
                     tables_differences.setdefault(table, []).append({
                         "table": table,
-                        "base1_table": "✅ existe" if table1_exists else "❌ absente",
-                        "base2_table": "✅ existe" if table2_exists else "❌ absente"
+                        "base1_table": "✅ existe" if table in tables1 else "❌ absente",
+                        "base2_table": "✅ existe" if table in tables2 else "❌ absente"
                     })
                     continue
 
+                # Colonnes communes
                 cursor1.execute(f"SHOW COLUMNS FROM `{table}`")
                 cols1 = [c["Field"] for c in cursor1.fetchall()]
-
                 cursor2.execute(f"SHOW COLUMNS FROM `{table}`")
                 cols2 = [c["Field"] for c in cursor2.fetchall()]
 
                 common_cols = list(set(cols1) & set(cols2))
+                if selected_columns_by_table.get(table):
+                    common_cols = [c for c in common_cols if c in selected_columns_by_table[table]]
+
                 if not common_cols:
                     continue
 
+                # Récupération des données
                 cursor1.execute(f"SELECT * FROM `{table}`")
                 rows1 = cursor1.fetchall()
-
                 cursor2.execute(f"SELECT * FROM `{table}`")
                 rows2 = cursor2.fetchall()
 
-                key = next((k for k in ["id", "identifiant"] if k in common_cols), common_cols[0])
-                dict1 = {r[key]: r for r in rows1 if key in r}
-                dict2 = {r[key]: r for r in rows2 if key in r}
+                max_rows = max(len(rows1), len(rows2))
 
-                all_ids = set(dict1.keys()) | set(dict2.keys())
-
-                for ident in all_ids:
-                    r1 = dict1.get(ident)
-                    r2 = dict2.get(ident)
-
+                for i in range(max_rows):
+                    r1 = rows1[i] if i < len(rows1) else {}
+                    r2 = rows2[i] if i < len(rows2) else {}
                     row_diff = {}
                     has_diff = False
-                    for col in common_cols:
-                        if col == key:
-                            continue  # on ignore la colonne clé
 
+                    for col in common_cols:
                         val1 = r1.get(col) if r1 else None
                         val2 = r2.get(col) if r2 else None
-
-                        if str(val1).strip() != str(val2).strip():
+                        if str(val1) != str(val2):
                             has_diff = True
-                            row_diff[f"base1_{col}"] = val1
-                            row_diff[f"base2_{col}"] = val2
-                    if has_diff or not r1 or not r2:
-                        row_diff["table"] = table
-                        row_diff[key] = ident
+                        row_diff[f"{col}_base1"] = val1
+                        row_diff[f"{col}_base2"] = val2
+
+                    # Ajouter la ligne seulement si une différence ou présence d'une ligne manquante
+                    if has_diff or r1 or r2:
                         tables_differences.setdefault(table, []).append(row_diff)
 
             notification = (
                 f"⚠️ {sum(len(v) for v in tables_differences.values())} différence(s)"
                 if tables_differences else "✅ aucune différence"
             )
+
             conn1.close()
             conn2.close()
 
@@ -390,11 +407,11 @@ def comparaison():
         "comparaison.html",
         bases=bases_disponibles,
         all_tables=all_tables,
+        columns_by_table=columns_by_table,
+        selected_columns_by_table=selected_columns_by_table,
         tables_differences=tables_differences,
         notification=notification
     )
-
-
 
 @app.route("/ajouter", methods=["GET", "POST"])
 def ajouter():
@@ -471,7 +488,9 @@ def liste():
 
     cursor = conn.cursor(dictionary=True)  # Permet d’accéder aux colonnes par nom
     cursor.execute("SELECT * FROM bases ORDER BY id DESC")
+    
     bases = cursor.fetchall()
+
     conn.close()
     return render_template("liste.html", bases=bases)
 
