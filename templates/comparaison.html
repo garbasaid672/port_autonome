@@ -37,14 +37,28 @@
 </div>
 {% endif %}
 
-<h3 class="mt-4">{{ notification }}</h3>
+{% if phase1_summary %}
+<div class="card mt-4">
+    <div class="card-header">Résumé de la Phase 1 : Comparaison Interne</div>
+    <div class="card-body">
+        <ul>
+            {% for base, summary in phase1_summary.items() %}
+                <li><strong>{{ base }}</strong> : {{ summary }}</li>
+            {% endfor %}
+        </ul>
+        <p class="text-muted small">Les informations identiques entre table1 et table2 ont été conservées dans table2, les autres ont été déplacées vers table1.</p>
+    </div>
+</div>
+{% endif %}
 
-<table class="table table-bordered">
+<h3 class="mt-4">Phase 2 : Comparaison entre bases (Table2 vs Table2)</h3>
+
+<table class="table table-bordered" id="differencesTable">
     <thead class="table-light">
         <tr>
             <th>Ligne</th>
-            <th>Base 1</th>
-            <th>Base 2</th>
+            <th>Base 1 (Table 2)</th>
+            <th>Base 2 (Table 2)</th>
         </tr>
     </thead>
     <tbody>
