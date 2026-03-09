@@ -22,9 +22,8 @@
 
 <h2 class="mb-4">Comparer des bases de données</h2>
 
-<form method="POST" action="{{ url_for('comparaison') }}" class="mb-5">
-
-    <!-- ================== BASE 1 ================== -->
+<form action="{{ url_for('comparaison') }}" method="POST">
+    <!--  BASE 1  -->
     <div class="mb-3">
         <label for="base1" class="form-label fw-bold">Base 1 :</label>
         <select id="base1" name="base1" class="form-select">
@@ -37,7 +36,7 @@
         </select>
     </div>
 
-    <!-- ================== BASE 2 ================== -->
+    <!--  BASE 2  -->
     <div class="mb-4">
         <label for="base2" class="form-label fw-bold">Base 2 :</label>
         <select id="base2" name="base2" class="form-select">
@@ -49,7 +48,7 @@
         </select>
     </div>
 
-    <!-- ================== TABLES ================== -->
+    <!--  TABLES  -->
     {% if all_tables %}
     <div class="mb-4">
         <strong>Choisissez les tables à comparer :</strong><br>
@@ -69,7 +68,7 @@
     </div>
     {% endif %}
 
-    <!-- ================== COLONNES ================== -->
+    <!--  COLONNES  -->
     {% if columns_by_table %}
     <div class="mb-4">
         <h5>Sélectionner les colonnes à comparer :</h5>
@@ -87,44 +86,115 @@
     </div>
     {% endif %}
 
-    <!-- ================== BOUTON ================== -->
+    <!--  BOUTON  -->
     <div class="mb-4">
         <button type="submit" class="btn btn-primary w-100 fw-bold">Comparer</button>
     </div>
 
 </form>
 
-<!-- ================== NOTIFICATION ================== -->
+<!--  NOTIFICATION  -->
 {% if notification %}
 <div class="alert alert-info">
     {{ notification }}
 </div>
 {% endif %}
-
-<!-- ================== DIFFERENCES ================== -->
-{% for table, rows in tables_differences.items() %}
-    <h4 class="mt-4">Table : {{ table }}</h4>
-    <table class="table table-bordered differences-table">
-        <thead>
-            <tr>
-                {% for col in selected_columns_by_table[table] %}
-                    <th>{{ col }} (Base 1)</th>
-                    <th>{{ col }} (Base 2)</th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in rows %}
-                <tr>
-                    {% for col in selected_columns_by_table[table] %}
-                        <td>{{ row[col + '_base1'] }}</td>
-                        <td>{{ row[col + '_base2'] }}</td>
-                    {% endfor %}
-                </tr>
+<!-- Comparaison intra-base Base 1 -->
+{% if diff_base1 %}
+<h3 class="mt-4">Comparaison interne : Base 1</h3>
+{% for table, rows in diff_base1.items() %}
+<h5>Table : {{ table }}</h5>
+<table class="table table-bordered differences-table">
+    <thead>
+        <tr>
+            {% for col in selected_columns_by_table.get(table, []) %}
+                <th>{{ col }} (Table1)</th>
+                <th>{{ col }} (Table2)</th>
             {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% for col in selected_columns_by_table.get(table, []) %}
+                <!-- Pour intra-base, on peut juste afficher la même valeur dans les deux colonnes -->
+                <td>{{ row[col] }}</td>
+                <td>{{ row[col] }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+{% endif %}
+
+<!-- Comparaison intra-base Base 2 -->
+{% if diff_base2 %}
+<h3 class="mt-4">Comparaison interne : Base 2</h3>
+{% for table, rows in diff_base2.items() %}
+<h5>Table : {{ table }}</h5>
+<table class="table table-bordered differences-table">
+    <thead>
+        <tr>
+            {% for col in selected_columns_by_table.get(table, []) %}
+                <th>{{ col }} (Table1)</th>
+                <th>{{ col }} (Table2)</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% for col in selected_columns_by_table.get(table, []) %}
+                <td>{{ row[col] }}</td>
+                <td>{{ row[col] }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+{% endif %}
+
+<!-- Comparaison entre bases -->
+{% if tables_differences %}
+<h3 class="mt-4">Comparaison entre bases</h3>
+{% for table_key, rows in tables_differences.items() %}
+<h5>{{ table_key }}</h5>
+<table class="table table-bordered differences-table">
+    <thead>
+        <tr>
+            {% set cols = selected_columns_by_table.get(table_key) or [] %}
+            {% if not cols %}
+                {% set cols = selected_columns_by_table.get(selected_tables[1], []) %}
+            {% endif %}
+            {% for col in cols %}
+                <th>{{ col }} (Base 1)</th>
+                <th>{{ col }} (Base 2)</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% for col in cols %}
+                <td>{{ row[col + '_base1'] }}</td>
+                <td>{{ row[col + '_base2'] }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+{% else %}
+<div class="alert alert-success mt-4">
+    ✅ Aucune différence trouvée entre les bases.
+</div>
+
+{% endif %}
         </tbody>
     </table>
-{% endfor %}
+
 
 <!-- Boutons copy/notify -->
 <div class="d-flex gap-2 mt-3">
