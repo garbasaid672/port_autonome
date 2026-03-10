@@ -290,6 +290,9 @@ def comparaison():
     tables_differences = {}
     diff_base1 = {}  # Comparaison intra-base 1
     diff_base2 = {}  # Comparaison intra-base 2
+    lignes_identiques_base1 = {}  # ✅ nouvelle table2 Base1
+    lignes_identiques_base2 = {}  # ✅ nouvelle table2 Base2
+
     bases_disponibles = get_all_databases_with_bases()
     all_tables = []
     columns_by_table = {}
@@ -347,7 +350,6 @@ def comparaison():
                 for table in selected_tables
             }
 
-            # Si aucune colonne sélectionnée
             for table in selected_tables:
                 if not selected_columns_by_table[table]:
                     selected_columns_by_table[table] = columns_by_table.get(table, [])
@@ -374,21 +376,10 @@ def comparaison():
                 cursor1.execute(f"SELECT * FROM `{table2}`")
                 rows1_t2 = cursor1.fetchall()
 
-                identiques_base1 = []
                 differences_base1 = []
-
                 for r1 in rows1_t1:
-                    trouve_identique = False
-
-                    for r2 in rows1_t2:
-                        if all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols):
-                            identiques_base1.append(r1)
-                            trouve_identique = True
-                            break
-
-                    if not trouve_identique:
+                    if not any(all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols) for r2 in rows1_t2):
                         differences_base1.append(r1)
-
                 diff_base1[table1] = differences_base1
 
                 # =============================
@@ -400,22 +391,23 @@ def comparaison():
                 cursor2.execute(f"SELECT * FROM `{table2}`")
                 rows2_t2 = cursor2.fetchall()
 
-                identiques_base2 = []
                 differences_base2 = []
-
                 for r1 in rows2_t1:
-                    trouve_identique = False
-
-                    for r2 in rows2_t2:
-                        if all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols):
-                            identiques_base2.append(r1)
-                            trouve_identique = True
-                            break
-
-                    if not trouve_identique:
+                    if not any(all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols) for r2 in rows2_t2):
                         differences_base2.append(r1)
-
                 diff_base2[table1] = differences_base2
+
+                # =============================
+                # Nouvelle Table2 avant inter-base
+                # =============================
+                cursor1.execute(f"SELECT * FROM `{table2}`")
+                rows1_t2 = cursor1.fetchall()
+                cursor2.execute(f"SELECT * FROM `{table2}`")
+                rows2_t2 = cursor2.fetchall()
+                
+                lignes_identiques_base1[table2] = rows1_t2 if rows1_t2 else []
+                lignes_identiques_base2[table2] = rows2_t2 if rows2_t2 else []
+                
 
                 # =============================
                 # Comparaison inter-base
@@ -427,20 +419,16 @@ def comparaison():
                 rows2_t2_updated = cursor2.fetchall()
 
                 common_cols_table2 = selected_columns_by_table.get(table2)
-
                 if not common_cols_table2:
                     common_cols_table2 = common_cols
 
-                # dictionnaires par id
                 rows1_dict = {r["id_user"]: r for r in rows1_t2_updated if "id_user" in r}
                 rows2_dict = {r["id_user"]: r for r in rows2_t2_updated if "id_user" in r}
 
                 all_ids = set(rows1_dict.keys()) | set(rows2_dict.keys())
-
                 diff_bases = []
 
                 for rid in all_ids:
-
                     r1 = rows1_dict.get(rid, {})
                     r2 = rows2_dict.get(rid, {})
 
@@ -450,13 +438,10 @@ def comparaison():
                     for col in common_cols_table2:
                         if col == "id_user":
                             continue
-
                         v1 = r1.get(col)
                         v2 = r2.get(col)
-
                         if str(v1) != str(v2):
                             has_diff = True
-
                         row_diff[f"{col}_base1"] = v1
                         row_diff[f"{col}_base2"] = v2
 
@@ -468,9 +453,6 @@ def comparaison():
                 conn1.close()
                 conn2.close()
 
-    # =============================
-    # Rendu template
-    # =============================
     return render_template(
         "comparaison.html",
         bases=bases_disponibles,
@@ -478,6 +460,8 @@ def comparaison():
         columns_by_table=columns_by_table,
         selected_columns_by_table=selected_columns_by_table,
         tables_differences=tables_differences,
+        lignes_identiques_base1=lignes_identiques_base1,
+        lignes_identiques_base2=lignes_identiques_base2,
         diff_base1=diff_base1,
         diff_base2=diff_base2,
         notification=notification

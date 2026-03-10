@@ -47,7 +47,9 @@
             {% endfor %}
         </select>
     </div>
+    <!-- Nouvelle table2 identique entre les bases -->
 
+   
     <!--  TABLES  -->
     {% if all_tables %}
     <div class="mb-4">
@@ -103,28 +105,27 @@
 {% if diff_base1 %}
 <h3 class="mt-4">Comparaison interne : Base 1</h3>
 {% for table, rows in diff_base1.items() %}
-<h5>Table : {{ table }}</h5>
-<table class="table table-bordered differences-table">
-    <thead>
-        <tr>
-            {% for col in selected_columns_by_table.get(table, []) %}
-                <th>{{ col }} (Table1)</th>
-                <th>{{ col }} (Table2)</th>
+    <h5>Table : {{ table }}</h5>
+    <table class="table table-bordered differences-table">
+        <thead>
+            <tr>
+                {% for col in selected_columns_by_table.get(table, []) %}
+                    <th>{{ col }} (Table1)</th>
+                    <th>{{ col }} (Table2)</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for col in selected_columns_by_table.get(table, []) %}
+                    <td>{{ row[col] }}</td>
+                    <td>{{ row[col] }}</td>
+                {% endfor %}
+            </tr>
             {% endfor %}
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        <tr>
-            {% for col in selected_columns_by_table.get(table, []) %}
-                <!-- Pour intra-base, on peut juste afficher la même valeur dans les deux colonnes -->
-                <td>{{ row[col] }}</td>
-                <td>{{ row[col] }}</td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        </tbody>
+    </table>
 {% endfor %}
 {% endif %}
 
@@ -132,27 +133,75 @@
 {% if diff_base2 %}
 <h3 class="mt-4">Comparaison interne : Base 2</h3>
 {% for table, rows in diff_base2.items() %}
-<h5>Table : {{ table }}</h5>
-<table class="table table-bordered differences-table">
-    <thead>
-        <tr>
-            {% for col in selected_columns_by_table.get(table, []) %}
-                <th>{{ col }} (Table1)</th>
-                <th>{{ col }} (Table2)</th>
+    <h5>Table : {{ table }}</h5>
+    <table class="table table-bordered differences-table">
+        <thead>
+            <tr>
+                {% for col in selected_columns_by_table.get(table, []) %}
+                    <th>{{ col }} (Table1)</th>
+                    <th>{{ col }} (Table2)</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for col in selected_columns_by_table.get(table, []) %}
+                    <td>{{ row[col] }}</td>
+                    <td>{{ row[col] }}</td>
+                {% endfor %}
+            </tr>
             {% endfor %}
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        <tr>
-            {% for col in selected_columns_by_table.get(table, []) %}
-                <td>{{ row[col] }}</td>
-                <td>{{ row[col] }}</td>
+        </tbody>
+    </table>
+{% endfor %}
+{% endif %}
+
+<!-- Nouvelle Table2 Base 1 -->
+{% if lignes_identiques_base1 %}
+<h3 class="mt-4">Nouvelle Table 2 - Base 1</h3>
+{% for table, rows in lignes_identiques_base1.items() %}
+    {% if rows|length > 0 %}
+    <h5>{{ table }}</h5>
+    <table class="table table-bordered table-success">
+        <thead>
+            <tr>
+                {% for col in rows[0].keys() %}<th>{{ col }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+            </tr>
             {% endfor %}
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        </tbody>
+    </table>
+    {% endif %}
+{% endfor %}
+{% endif %}
+
+<!-- Nouvelle Table2 Base 2 -->
+{% if lignes_identiques_base2 %}
+<h3 class="mt-4">Nouvelle Table 2 - Base 2</h3>
+{% for table, rows in lignes_identiques_base1.items() %}
+    {% if rows|length > 0 %}
+    <h5>{{ table }}</h5>
+    <table class="table table-bordered table-success">
+        <thead>
+            <tr>
+                {% for col in rows[0].keys() %}<th>{{ col }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for val in row.values() %}<td>{{ val }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
 {% endfor %}
 {% endif %}
 
