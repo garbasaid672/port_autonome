@@ -229,8 +229,7 @@ def index():
         "mysql",
         "information_schema",
         "performance_schema",
-        "phpmyadmin",
-        "test"
+        "phpmyadmin"
     }
 
     all_databases = [
@@ -288,15 +287,16 @@ def comparaison():
 
     notification = ""
     tables_differences = {}
-    diff_base1 = {}  # Comparaison intra-base 1
-    diff_base2 = {}  # Comparaison intra-base 2
-    lignes_identiques_base1 = {}  # ✅ nouvelle table2 Base1
-    lignes_identiques_base2 = {}  # ✅ nouvelle table2 Base2
-
-    bases_disponibles = get_all_databases_with_bases()
-    all_tables = []
-    columns_by_table = {}
+    diff_base1 = {}
+    diff_base2 = {}
+    lignes_identiques_base1 = {}
+    lignes_identiques_base2 = {}
     selected_columns_by_table = {}
+
+    # =============================
+    # Bases disponibles
+    # =============================
+    bases_disponibles = get_all_databases_with_bases()
 
     base1_name = request.form.get("base1")
     base2_name = request.form.get("base2")
@@ -322,141 +322,150 @@ def comparaison():
             tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
             conn2.close()
 
-    if tables1 or tables2:
-        all_tables = sorted(set(tables1) & set(tables2))
+    # =============================
+    # Préparer les colonnes
+    # =============================
+    columns_by_table = {}
+
+    if base1_name and tables1:
+        conn = get_db_connection(base1_name)
+        if conn:
+            cursor = conn.cursor(dictionary=True)
+
+            for table in tables1:
+                cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+                columns_by_table[table] = [c["Field"] for c in cursor.fetchall()]
+
+            conn.close()
 
     # =============================
     # Traitement POST
     # =============================
     if request.method == "POST":
-        selected_tables = request.form.getlist("tables")
 
-        # ETAPE 1 : récupération des colonnes
-        if selected_tables and not any(k.startswith("columns_") for k in request.form.keys()):
-            if base1_name:
-                conn = get_db_connection(base1_name)
-                cursor = conn.cursor(dictionary=True)
+        selected_table = request.form.get("tables")
 
-                for table in selected_tables:
-                    cursor.execute(f"SHOW COLUMNS FROM `{table}`")
-                    columns_by_table[table] = [c["Field"] for c in cursor.fetchall()]
-
-                conn.close()
-
-        # ETAPE 2 : comparaison
+        if not selected_table:
+                    notification = "Veuillez sélectionner une table."
         else:
+            table1 = selected_table
+            table2 = selected_table
+
+            # Colonnes disponibles
+            cols1 = columns_by_table.get(table1, [])
+            cols2 = columns_by_table.get(table2, [])
+
+            # Colonnes sélectionnées dans le formulaire
+            selected_cols1 = request.form.getlist(f"columns_{table1}")
+            selected_cols2 = request.form.getlist(f"columns_{table2}")
+
+            # Si aucune colonne cochée → toutes les colonnes
+            if not selected_cols1:
+                selected_cols1 = cols1
+
+            if not selected_cols2:
+                selected_cols2 = cols2
+
+            # Colonnes communes
+            common_cols = list(set(selected_cols1) & set(selected_cols2))
+
             selected_columns_by_table = {
-                table: request.form.getlist(f"columns_{table}")
-                for table in selected_tables
+                table1: common_cols,
+                table2: common_cols
             }
 
-            for table in selected_tables:
-                if not selected_columns_by_table[table]:
-                    selected_columns_by_table[table] = columns_by_table.get(table, [])
+            if not common_cols:
+                notification += "Aucune colonne commune pour comparer ces tables."
 
-            if len(selected_tables) != 2:
-                notification = "Veuillez verifier si vous aviez au moins 2 tables"
+            # =============================
+            # Comparaison intra-base 1
+            # =============================
+            conn1 = get_db_connection(base1_name)
+            cursor1 = conn1.cursor(dictionary=True)
 
-            else:
-                table1, table2 = selected_tables
-                common_cols = selected_columns_by_table.get(table1, [])
+            cursor1.execute(f"SELECT * FROM `{table1}`")
+            rows1_t1 = cursor1.fetchall()
 
-                conn1 = get_db_connection(base1_name)
-                conn2 = get_db_connection(base2_name)
+            cursor1.execute(f"SELECT * FROM `{table2}`")
+            rows1_t2 = cursor1.fetchall()
 
-                cursor1 = conn1.cursor(dictionary=True)
-                cursor2 = conn2.cursor(dictionary=True)
+            conn1.close()
 
-                # =============================
-                # Comparaison intra-base 1
-                # =============================
-                cursor1.execute(f"SELECT * FROM `{table1}`")
-                rows1_t1 = cursor1.fetchall()
+            diff_base1[table1] = [
+                r1 for r1 in rows1_t1
+                if not any(
+                    all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols)
+                    for r2 in rows1_t2
+                )
+            ]
 
-                cursor1.execute(f"SELECT * FROM `{table2}`")
-                rows1_t2 = cursor1.fetchall()
+            # =============================
+            # Comparaison intra-base 2
+            # =============================
+            conn2 = get_db_connection(base2_name)
+            cursor2 = conn2.cursor(dictionary=True)
 
-                differences_base1 = []
-                for r1 in rows1_t1:
-                    if not any(all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols) for r2 in rows1_t2):
-                        differences_base1.append(r1)
-                diff_base1[table1] = differences_base1
+            cursor2.execute(f"SELECT * FROM `{table1}`")
+            rows2_t1 = cursor2.fetchall()
 
-                # =============================
-                # Comparaison intra-base 2
-                # =============================
-                cursor2.execute(f"SELECT * FROM `{table1}`")
-                rows2_t1 = cursor2.fetchall()
+            cursor2.execute(f"SELECT * FROM `{table2}`")
+            rows2_t2 = cursor2.fetchall()
 
-                cursor2.execute(f"SELECT * FROM `{table2}`")
-                rows2_t2 = cursor2.fetchall()
+            conn2.close()
 
-                differences_base2 = []
-                for r1 in rows2_t1:
-                    if not any(all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols) for r2 in rows2_t2):
-                        differences_base2.append(r1)
-                diff_base2[table1] = differences_base2
+            diff_base2[table1] = [
+                r1 for r1 in rows2_t1
+                if not any(
+                    all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols)
+                    for r2 in rows2_t2
+                )
+            ]
 
-                # =============================
-                # Nouvelle Table2 avant inter-base
-                # =============================
-                cursor1.execute(f"SELECT * FROM `{table2}`")
-                rows1_t2 = cursor1.fetchall()
-                cursor2.execute(f"SELECT * FROM `{table2}`")
-                rows2_t2 = cursor2.fetchall()
-                
-                lignes_identiques_base1[table2] = rows1_t2 if rows1_t2 else []
-                lignes_identiques_base2[table2] = rows2_t2 if rows2_t2 else []
-                
+            # =============================
+            # Préparer comparaison inter-base
+            # =============================
+            lignes_identiques_base1[table2] = rows1_t2
+            lignes_identiques_base2[table2] = rows2_t2
 
-                # =============================
-                # Comparaison inter-base
-                # =============================
-                cursor1.execute(f"SELECT * FROM `{table2}`")
-                rows1_t2_updated = cursor1.fetchall()
+            rows1_dict = {r["id"]: r for r in rows1_t2 if "id" in r}
+            rows2_dict = {r["id"]: r for r in rows2_t2 if "id" in r}
 
-                cursor2.execute(f"SELECT * FROM `{table2}`")
-                rows2_t2_updated = cursor2.fetchall()
+            all_ids = set(rows1_dict.keys()) | set(rows2_dict.keys())
 
-                common_cols_table2 = selected_columns_by_table.get(table2)
-                if not common_cols_table2:
-                    common_cols_table2 = common_cols
+            diff_bases = []
 
-                rows1_dict = {r["id_user"]: r for r in rows1_t2_updated if "id_user" in r}
-                rows2_dict = {r["id_user"]: r for r in rows2_t2_updated if "id_user" in r}
+            for rid in all_ids:
 
-                all_ids = set(rows1_dict.keys()) | set(rows2_dict.keys())
-                diff_bases = []
+                r1 = rows1_dict.get(rid, {})
+                r2 = rows2_dict.get(rid, {})
 
-                for rid in all_ids:
-                    r1 = rows1_dict.get(rid, {})
-                    r2 = rows2_dict.get(rid, {})
+                row_diff = {"id": rid}
+                has_diff = False
 
-                    row_diff = {"id": rid}
-                    has_diff = False
+                for col in common_cols:
 
-                    for col in common_cols_table2:
-                        if col == "id_user":
-                            continue
-                        v1 = r1.get(col)
-                        v2 = r2.get(col)
-                        if str(v1) != str(v2):
-                            has_diff = True
-                        row_diff[f"{col}_base1"] = v1
-                        row_diff[f"{col}_base2"] = v2
+                    if col == "id":
+                        continue
 
-                    if has_diff:
-                        diff_bases.append(row_diff)
+                    v1 = r1.get(col)
+                    v2 = r2.get(col)
 
-                tables_differences[table2] = diff_bases
+                    if str(v1) != str(v2):
+                        has_diff = True
 
-                conn1.close()
-                conn2.close()
+                    row_diff[f"{col}_base1"] = v1
+                    row_diff[f"{col}_base2"] = v2
+
+                if has_diff:
+                    diff_bases.append(row_diff)
+
+            tables_differences[table2] = diff_bases
 
     return render_template(
         "comparaison.html",
         bases=bases_disponibles,
-        all_tables=all_tables,
+        all_tables_base1=tables1,
+        all_tables_base2=tables2,
         columns_by_table=columns_by_table,
         selected_columns_by_table=selected_columns_by_table,
         tables_differences=tables_differences,

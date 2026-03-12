@@ -50,25 +50,45 @@
     <!-- Nouvelle table2 identique entre les bases -->
 
    
-    <!--  TABLES  -->
-    {% if all_tables %}
-    <div class="mb-4">
-        <strong>Choisissez les tables à comparer :</strong><br>
-        {% for table in all_tables %}
-            <div class="form-check">
-                <input class="form-check-input"
-                        type="checkbox"
-                        name="tables"
-                        value="{{ table }}"
-                        id="table_{{ loop.index }}"
-                        {% if table in request.form.getlist('tables') %}checked{% endif %}>
-                <label class="form-check-label" for="table_{{ loop.index }}">
-                    {{ table }}
-                </label>
-            </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+<!--  TABLES Base 1 -->
+{% if all_tables_base1 %}
+<div class="mb-4">
+    <strong>Tables dans Base 1 :</strong><br>
+    {% for table in all_tables_base1 %}
+        <div class="form-check">
+            <input class="form-check-input"
+                    type="checkbox"
+                    name="tables"
+                    value="{{ table }}"
+                    id="table1_{{ loop.index }}"
+                    {% if table in request.form.getlist('tables') %}checked{% endif %}>
+            <label class="form-check-label" for="table1_{{ loop.index }}">
+                {{ table }}
+            </label>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!--  TABLES Base 2 -->
+{% if all_tables_base2 %}
+<div class="mb-4">
+    <strong>Tables dans Base 2 :</strong><br>
+    {% for table in all_tables_base2 %}
+        <div class="form-check">
+            <input class="form-check-input"
+                    type="checkbox"
+                    name="tables"
+                    value="{{ table }}"
+                    id="table2_{{ loop.index }}"
+                    {% if table in request.form.getlist('tables') %}checked{% endif %}>
+            <label class="form-check-label" for="table2_{{ loop.index }}">
+                {{ table }}
+            </label>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
 
     <!--  COLONNES  -->
     {% if columns_by_table %}
@@ -184,7 +204,7 @@
 <!-- Nouvelle Table2 Base 2 -->
 {% if lignes_identiques_base2 %}
 <h3 class="mt-4">Nouvelle Table 2 - Base 2</h3>
-{% for table, rows in lignes_identiques_base1.items() %}
+{% for table, rows in lignes_identiques_base2.items() %}
     {% if rows|length > 0 %}
     <h5>{{ table }}</h5>
     <table class="table table-bordered table-success">
