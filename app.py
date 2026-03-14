@@ -331,11 +331,9 @@ def comparaison():
         conn = get_db_connection(base1_name)
         if conn:
             cursor = conn.cursor(dictionary=True)
-
             for table in tables1:
                 cursor.execute(f"SHOW COLUMNS FROM `{table}`")
                 columns_by_table[table] = [c["Field"] for c in cursor.fetchall()]
-
             conn.close()
 
     # =============================
@@ -346,7 +344,7 @@ def comparaison():
         selected_table = request.form.get("tables")
 
         if not selected_table:
-                    notification = "Veuillez sélectionner une table."
+            notification = "Veuillez sélectionner une table."
         else:
             table1 = selected_table
             table2 = selected_table
@@ -362,7 +360,6 @@ def comparaison():
             # Si aucune colonne cochée → toutes les colonnes
             if not selected_cols1:
                 selected_cols1 = cols1
-
             if not selected_cols2:
                 selected_cols2 = cols2
 
@@ -378,48 +375,61 @@ def comparaison():
                 notification += "Aucune colonne commune pour comparer ces tables."
 
             # =============================
-            # Comparaison intra-base 1
+            # Récupérer les lignes des deux bases
             # =============================
             conn1 = get_db_connection(base1_name)
             cursor1 = conn1.cursor(dictionary=True)
-
             cursor1.execute(f"SELECT * FROM `{table1}`")
             rows1_t1 = cursor1.fetchall()
-
             cursor1.execute(f"SELECT * FROM `{table2}`")
             rows1_t2 = cursor1.fetchall()
-
             conn1.close()
 
-            diff_base1[table1] = [
-                r1 for r1 in rows1_t1
-                if not any(
-                    all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols)
-                    for r2 in rows1_t2
-                )
-            ]
-
-            # =============================
-            # Comparaison intra-base 2
-            # =============================
             conn2 = get_db_connection(base2_name)
             cursor2 = conn2.cursor(dictionary=True)
-
             cursor2.execute(f"SELECT * FROM `{table1}`")
             rows2_t1 = cursor2.fetchall()
-
             cursor2.execute(f"SELECT * FROM `{table2}`")
             rows2_t2 = cursor2.fetchall()
-
             conn2.close()
 
-            diff_base2[table1] = [
-                r1 for r1 in rows2_t1
-                if not any(
-                    all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols)
-                    for r2 in rows2_t2
-                )
-            ]
+            # =============================
+            # Comparaison intra-base 1 (Base1)
+            # =============================
+            diff_base1[table1] = []
+            common_base1_table2 = []
+
+            for r1 in rows1_t1:
+                found = False
+                for r2 in rows1_t2:
+                    if all(str(r1.get(col)) == str(r2.get(col)) for col in common_cols):
+                        found = True
+                        break
+                if found:
+                    common_base1_table2.append(r2)  # Table2 garde les identiques
+                else:
+                    diff_base1[table1].append(r1)  # Table1 garde les différences
+
+            diff_base1[table2] = common_base1_table2
+
+            # =============================
+            # Comparaison intra-base 2 (Base2)
+            # =============================
+            diff_base2[table2] = []
+            common_base2_table1 = []
+
+            for r2 in rows2_t2:
+                found = False
+                for r1 in rows2_t1:
+                    if all(str(r2.get(col)) == str(r1.get(col)) for col in common_cols):
+                        found = True
+                        break
+                if found:
+                    common_base2_table1.append(r1)  # Table1 garde les identiques
+                else:
+                    diff_base2[table2].append(r2)  # Table2 garde les différences
+
+            diff_base2[table1] = common_base2_table1
 
             # =============================
             # Préparer comparaison inter-base
@@ -435,7 +445,6 @@ def comparaison():
             diff_bases = []
 
             for rid in all_ids:
-
                 r1 = rows1_dict.get(rid, {})
                 r2 = rows2_dict.get(rid, {})
 
@@ -443,18 +452,14 @@ def comparaison():
                 has_diff = False
 
                 for col in common_cols:
-
                     if col == "id":
                         continue
-
                     v1 = r1.get(col)
                     v2 = r2.get(col)
-
                     if str(v1) != str(v2):
                         has_diff = True
-
-                    row_diff[f"{col}_base1"] = v1
-                    row_diff[f"{col}_base2"] = v2
+                        row_diff[f"{col}_base1"] = v1
+                        row_diff[f"{col}_base2"] = v2
 
                 if has_diff:
                     diff_bases.append(row_diff)
