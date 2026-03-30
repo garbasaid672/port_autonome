@@ -304,9 +304,9 @@ def comparaison():
 
     tables1, tables2 = [], []
 
-    # =============================
-    # PHASE 1 : Récupération des tables
-    # =============================
+    
+    # etape 1 : Récupération des tables
+    
     if base1_name:
         conn1 = get_db_connection(base1_name)
         if conn1:
@@ -322,10 +322,11 @@ def comparaison():
             cursor2.execute("SHOW TABLES")
             tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
             conn2.close()
+            print("Hi")
 
-    # =============================
-    # PHASE 2 : Traitement POST
-    # =============================
+    
+    # etape 2 : Traitement POST
+    
     if request.method == "POST":
 
         # Vérification minimale
@@ -333,9 +334,9 @@ def comparaison():
             notification = "Veuillez sélectionner deux bases."
         else:
 
-            # ==========================================================
-            # PHASE 3 : COMPARAISON INTRA-BASE 1 (expo vs users)
-            # ==========================================================
+            
+            # etape 3 : COMPARAISON INTRA-BASE 1 (expo vs users)
+            
             if "expo" in tables1 and "users" in tables1:
 
                 conn = get_db_connection(base1_name)
@@ -382,9 +383,9 @@ def comparaison():
                 diff_base1["expo vs users"] = table1_diff
                 lignes_identiques_base1["expo vs users"] = table2_same
 
-            # ==========================================================
-            # PHASE 4 : COMPARAISON INTRA-BASE 2 (expo vs users)
-            # ==========================================================
+            
+            # etape 4 : COMPARAISON INTRA-BASE 2 (expo vs users)
+            
             if "expo" in tables2 and "users" in tables2:
 
                 conn = get_db_connection(base2_name)
@@ -431,9 +432,9 @@ def comparaison():
                 diff_base2["expo vs users"] = table1_diff
                 lignes_identiques_base2["expo vs users"] = table2_same
 
-            # ==========================================================
-            # PHASE 5 : COMPARAISON INTER-BASE (Table2 vs Table2)
-            # ==========================================================
+            
+            # etape 5 : COMPARAISON INTER-BASE (Table2 vs Table2)
+            
             table2_base1 = lignes_identiques_base1.get("expo vs users", [])
             table2_base2 = lignes_identiques_base2.get("expo vs users", [])
 
@@ -466,9 +467,9 @@ def comparaison():
 
             tables_differences["table2_base1 vs table2_base2"] = diff_final
 
-    # =============================
-    # PHASE 6 : RENDER HTML
-    # =============================
+    
+    # etape 6 : RENDER HTML
+    
     return render_template(
         "comparaison.html",
         bases=bases_disponibles,
