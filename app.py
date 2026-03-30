@@ -322,7 +322,7 @@ def comparaison():
             cursor2.execute("SHOW TABLES")
             tables2 = [list(t.values())[0] for t in cursor2.fetchall()]
             conn2.close()
-            print("Hi")
+            
 
     
     # etape 2 : Traitement POST
