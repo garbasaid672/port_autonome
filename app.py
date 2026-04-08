@@ -169,7 +169,7 @@ def notifier():
 
     
     emails_par_type = {
-        "VIDE": "garbamoha8@gmal.com.com",
+        "VIDE": "garbamoha8@gmail.com",
         "Erreur": "garbamohamedseidoul@gmail.com"
     }
 
