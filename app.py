@@ -161,54 +161,70 @@ def init_db():
 
 @app.route('/notifier', methods=['POST'])
 def notifier():
-
     data = request.get_json()
 
     differences = data.get("differences", [])
     base1 = data.get("base1", "base1")
     base2 = data.get("base2", "base2")
+
+    
+    emails_par_type = {
+        "VIDE": "garbamoha8@gmal.com.com",
+        "Erreur": "garbamohamedseidoul@gmail.com"
+    }
+
     try:
         
-        df = pd.DataFrame(differences)
-        
-        df.columns = [
-    col.replace("base1_", f"{base1}_")
-        .replace("base2_", f"{base2}_")
-    for col in df.columns
-]
+        diffs_par_type = {}
+        for diff in differences:
+            
+            types_ligne = set()
+            for k, v in diff.items():
+                if str(v) == "VIDE":
+                    types_ligne.add("VIDE")
+                elif str(v) == "Erreur":
+                    types_ligne.add("Erreur")
+            
+            if not types_ligne:
+                continue
+            for t in types_ligne:
+                diffs_par_type.setdefault(t, []).append(diff)
 
         
-        excel_file = "notification.xlsx"
-        df.to_excel(excel_file, index=False)
+        for erreur_type, diffs in diffs_par_type.items():
+            if not diffs:
+                continue
+            
+            df = pd.DataFrame(diffs)
+            
+            df.columns = [
+                col.replace("base1_", f"{base1}_").replace("base2_", f"{base2}_")
+                for col in df.columns
+            ]
+            excel_file = f"notification_{erreur_type}.xlsx"
+            df.to_excel(excel_file, index=False)
 
-        
-        msg = Message(
-            subject="Notification des différences",
-            sender=app.config['MAIL_USERNAME'],
-            
-            recipients=["garbamohamedseidoul@gmail.com"],   # On peux ajouter d'autres emails ici
-            
-            body="Bonjour,\n\nVeuillez trouver ci-joint le tableau des différences détectées.\n\nCordialement."
-        )
-
-        
-        with open(excel_file, "rb") as f:
-            
-            msg.attach(
-                
-                "notification.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                f.read()
+            msg = Message(
+                subject=f"Notification erreurs {erreur_type}",
+                sender=app.config['MAIL_USERNAME'],
+                recipients=[emails_par_type[erreur_type]],
+                body=f"Bonjour,\n\nVeuillez trouver ci-joint le tableau des erreurs '{erreur_type}' détectées.\n\nCordialement."
             )
 
-        #  Envoyer le mail
-        mail.send(msg)
-        print(" MAIL ENVOYÉ AVEC EXCEL")
+            with open(excel_file, "rb") as f:
+                msg.attach(
+                    excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    f.read()
+                )
+
+            mail.send(msg)
+            print(f"Mail envoyé à {emails_par_type[erreur_type]} avec {len(diffs)} erreurs {erreur_type}")
 
         return jsonify({"status": "success", "message": f"{len(differences)} différences envoyées avec succès"})
 
     except Exception as e:
-        print(" ERREUR MAIL :", e)
+        print("ERREUR MAIL :", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -242,7 +258,7 @@ def index():
 
     conn_global.close()
 
-    #  parcourir chaque base
+    
     for db_name in all_databases:
 
         conn = get_db_connection(db_name)
@@ -260,7 +276,7 @@ def index():
                 continue
 
             try:
-                #  ON PREND SEULEMENT id
+                
                 cursor.execute(f"SELECT id FROM `{table}`")
 
                 rows = cursor.fetchall()
@@ -302,9 +318,9 @@ def comparaison():
         colonnes_base1 = request.form.getlist("colonnes_base1")
         colonnes_base2 = request.form.getlist("colonnes_base2")
 
-        # ============================
-        # 🔁 COMPARAISON ENTRE 2 BASES
-        # ============================
+        
+        
+        # La comparaison entre deux base
         if base1_name and base2_name and table1_name and table2_name and colonnes_base1 and colonnes_base2:
 
             conn1 = get_db_connection(base1_name)
@@ -327,7 +343,7 @@ def comparaison():
 
             diff_final = []
 
-            # 👉 Compteurs
+            
             nb_absent_base1 = 0
             nb_absent_base2 = 0
             nb_diff = 0
@@ -360,7 +376,7 @@ def comparaison():
                     if val1 != val2:
                         has_diff = True
 
-                # 👉 Comptage des erreurs
+                
                 if not row_base1:
                     nb_absent_base1 += 1
                 elif not row_base2:
@@ -374,7 +390,7 @@ def comparaison():
             if diff_final:
                 tables_differences[f"{table1_name} vs {table2_name}"] = diff_final
 
-            # 👉 Construction notification
+            
             messages = []
 
             if nb_absent_base1:
@@ -391,47 +407,47 @@ def comparaison():
             else:
                 notification = " | ".join(messages)
 
-        # ============================
-        # 🔎 VÉRIFICATION MONO-BASE
-        # ============================
         elif base1_name and not base2_name and table1_name and colonnes_base1:
 
             conn1 = get_db_connection(base1_name)
             cursor1 = conn1.cursor(dictionary=True)
 
+            
             cursor1.execute(f"SELECT * FROM {table1_name}")
             rows1 = cursor1.fetchall()
 
+            
             cursor1.execute(f"SHOW COLUMNS FROM {table1_name}")
             type_expected = {}
-
             for col_info in cursor1.fetchall():
                 field = col_info['Field']
                 type_mysql = col_info['Type'].lower()
 
                 if 'int' in type_mysql or 'tinyint' in type_mysql:
                     type_expected[field] = "int"
-                    
                 elif 'decimal' in type_mysql or 'float' in type_mysql or 'double' in type_mysql:
                     type_expected[field] = "float"
                 else:
                     if field in ["age"]:
                         type_expected[field] = "int"
                     elif field in ["salaire"]:
-                        type_expected[field] = "float" 
-                    else: 
-                        type_expected[field] = "str"    
+                        type_expected[field] = "float"
+                    else:
+                        type_expected[field] = "str"
 
+            
             conn1.close()
 
             resultats = []
 
-            # 👉 Compteurs
+            
             nb_vides = 0
             nb_erreurs_type = 0
 
+            
             for r in rows1:
                 row_result = {"id": r.get("id")}
+                statuts = {}
 
                 for col in colonnes_base1:
                     expected_type = type_expected.get(col, "str")
@@ -448,7 +464,6 @@ def comparaison():
                             except:
                                 statut = "Erreur"
                                 nb_erreurs_type += 1
-
                         elif expected_type == "float":
                             try:
                                 float(str(v).strip())
@@ -456,31 +471,54 @@ def comparaison():
                             except:
                                 statut = "Erreur"
                                 nb_erreurs_type += 1
-
                         else:
                             statut = " "
 
-                    row_result[col] = v
+                    row_result[col] = v if v is not None else "VIDE"
                     row_result[f"statut_{col}"] = statut
+                    statuts[f"statut_{col}"] = statut
 
                 resultats.append(row_result)
 
             if nb_vides or nb_erreurs_type:
                 tables_differences[f"{table1_name} (vérification mono-base)"] = resultats
 
-            # 👉 Construction notification
-            messages = []
+                
+                diffs_par_type = {
+                    "VIDE": [],
+                    "TYPE": []
+                }
 
-            if nb_vides:
-                messages.append(f"{nb_vides} valeur(s) vide(s)")
+                for r in resultats:
+                    for col_statut, statut in r.items():
+                        if col_statut.startswith("statut_"):
+                            if statut == "VIDE":
+                                diffs_par_type["VIDE"].append(r)
+                            elif statut == "Erreur":
+                                diffs_par_type["TYPE"].append(r)
 
-            if nb_erreurs_type:
-                messages.append(f"{nb_erreurs_type} erreur(s) de type")
+                emails_par_type = {
+                    "VIDE": "garbamoha8@gmail.com",
+                    "TYPE": "garbamohamedseidoul@gmail.com"
+                }
 
-            if not messages:
-                notification = "Toutes les données sont conformes"
-            else:
-                notification = " | ".join(messages)
+                for typ, rows in diffs_par_type.items():
+                    if not rows:
+                        continue
+                    df = pd.DataFrame(rows)
+                    excel_file = f"notification_{typ}.xlsx"
+                    df.to_excel(excel_file, index=False)
+
+                    msg = Message(
+                        subject=f"Notification des erreurs {typ} : {table1_name}",
+                        sender=app.config['MAIL_USERNAME'],
+                        recipients=[emails_par_type[typ]],
+                        body=f"Bonjour,\n\nVeuillez trouver ci-joint le tableau des erreurs {typ} détectées pour {table1_name}.\n\nCordialement."
+                    )
+                    with open(excel_file, "rb") as f:
+                        msg.attach("notification.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", f.read())
+                    mail.send(msg)
+                    print(f"Mail envoyé à {emails_par_type[typ]} avec {len(rows)} erreurs {typ}")
 
     return render_template(
         "comparaison.html",
